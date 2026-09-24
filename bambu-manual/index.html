@@ -678,9 +678,32 @@
     updateFill();
   }
 
+  function viewFromHash(){
+    var v = location.hash.replace('#', '');
+    return views[v] ? v : 'top';
+  }
+  if('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
   document.querySelectorAll('[data-view]').forEach(function(el){
-    el.addEventListener('click', function(){ switchView(el.getAttribute('data-view')); });
+    el.addEventListener('click', function(){
+      var target = el.getAttribute('data-view');
+      if(target === 'top'){
+        if(history.state && history.state.pushed){ history.back(); return; }
+        history.replaceState({view:'top'}, '', location.pathname + location.search);
+      }else{
+        history.pushState({view:target, pushed:true}, '', '#' + target);
+      }
+      switchView(target);
+    });
   });
+
+  window.addEventListener('popstate', function(e){
+    switchView((e.state && e.state.view) || viewFromHash());
+  });
+
+  var initial = viewFromHash();
+  history.replaceState({view:initial}, '', location.href);
+  if(initial !== 'top') switchView(initial);
 
   var cards = document.querySelectorAll('.device-card');
   cards.forEach(function(card){
