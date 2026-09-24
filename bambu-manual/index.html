@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="メディアラボの3Dプリンター Bambu Lab A1 mini の操作ガイド(印刷・フィラメントロード・アンロード)">
+<title>A1 mini 操作ガイド</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+  @font-face{font-family:'MB101';font-weight:400;src:local('PGothicMB101Pr6N-Regular'),local('A P-OTF Gothic MB101 Pr6N R');}
+  @font-face{font-family:'MB101';font-weight:600;src:local('PGothicMB101Pr6N-DeBold'),local('A P-OTF Gothic MB101 Pr6N DB');}
+  @font-face{font-family:'MB101';font-weight:700;src:local('PGothicMB101Pr6N-Bold'),local('A P-OTF Gothic MB101 Pr6N B');}
+  :root{
+    --bg:#F4F4F4;
+    --ink:#222326;
+    --muted:#55585E;
+    --accent:#28B243;
+    --accent-text:#1E7F33;
+    --dark:#333437;
+    --foot:#666870;
+    --line:#222326;
+    --panel:#ECECEC;
+    --white:#FFFFFF;
+    --sans:'MB101','Zen Kaku Gothic New','Hiragino Kaku Gothic ProN','Hiragino Sans',sans-serif;
+    --num:'Arial Black','Helvetica Neue',Arial,sans-serif;
+    --hazard:repeating-linear-gradient(-45deg,var(--ink) 0 7px,var(--accent) 7px 14px);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-weight:400;overflow-x:hidden;}
+  h1,h2,h3,p{margin:0;}
+  p{line-height:1.9;}
+  button{font-family:inherit;color:inherit;}
+  [hidden]{display:none!important;}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:3px;}
+  .page{max-width:1200px;margin-inline:auto;padding-inline:20px;}
+  .label{font-size:12px;font-weight:600;letter-spacing:.14em;}
+
+  /* ---------- TOP ---------- */
+  .home{min-height:100vh;display:flex;flex-direction:column;}
+  .home-main{flex:1;width:100%;max-width:1100px;margin-inline:auto;padding:22px 20px 40px;}
+  .home-title{font-size:30px;font-weight:700;letter-spacing:.01em;line-height:1.3;padding-bottom:12px;border-bottom:2px solid var(--line);}
+  .home-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:28px;margin-top:22px;}
+  .home-col{display:flex;flex-direction:column;gap:24px;}
+  .pw{background:var(--dark);color:var(--white);padding:12px 16px 14px;}
+  .pw-label{font-size:12px;font-weight:600;letter-spacing:.04em;line-height:1.4;}
+  .pw-value{display:block;font-family:var(--sans);font-size:36px;font-weight:700;line-height:1.15;margin-top:2px;}
+  .menu{display:flex;flex-direction:column;gap:18px;}
+  .menu-card{
+    display:flex;align-items:center;gap:18px;width:100%;min-height:100px;padding:14px 22px;
+    background:var(--accent);color:var(--white);border:0;text-align:left;cursor:pointer;
+    box-shadow:8px 8px 0 var(--dark);
+  }
+  .menu-num{flex:none;width:2.05em;font-family:var(--num);font-weight:900;font-size:60px;line-height:1;letter-spacing:-.02em;}
+  .menu-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .menu-en{font-size:16px;font-weight:600;letter-spacing:.02em;line-height:1.3;}
+  .menu-jp{font-size:30px;font-weight:700;line-height:1.25;}
+  .home-stage{display:none;position:relative;}
+  .home-stage .stage-hint{position:absolute;right:0;bottom:0;font-size:12px;font-weight:600;color:var(--muted);pointer-events:none;}
+  .home-foot{background:var(--foot);color:var(--white);padding:20px 20px 26px;}
+  .home-foot-inner{max-width:1100px;margin-inline:auto;}
+  .home-foot h3{font-size:18px;font-weight:700;}
+  .home-foot p{font-size:13px;line-height:1.7;margin-top:8px;}
+
+  /* ---------- topbar + current-step bar ---------- */
+  .topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--dark);color:var(--white);}
+  .topbar-inner{max-width:1200px;margin-inline:auto;padding:12px 20px 10px;display:flex;align-items:center;gap:14px;}
+  .box-btn{
+    display:inline-flex;align-items:center;gap:6px;flex:none;cursor:pointer;
+    font-size:13px;font-weight:600;letter-spacing:.06em;line-height:1.3;
+    background:transparent;border:2px solid currentColor;padding:6px 12px;
+  }
+  .topbar .box-btn:hover{background:var(--white);color:var(--dark);}
+  .box-btn:hover{background:var(--ink);color:var(--white);}
+  .topbar-title{flex:1;min-width:0;font-size:17px;font-weight:700;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .topbar-title .jp{font-size:12px;font-weight:600;margin-left:8px;}
+  .progress-num{flex:none;font-family:var(--num);font-weight:900;font-size:16px;font-variant-numeric:tabular-nums;}
+  .step-now{color:var(--accent);}
+  .progress-track{height:4px;background:rgba(255,255,255,.14);}
+  .progress-fill{height:100%;width:0%;background:var(--accent);transition:width .15s ease-out;}
+  .fig-bar{
+    display:flex;align-items:baseline;gap:10px;padding:10px 20px;
+    background:var(--panel);color:var(--ink);border-top:2px solid var(--line);border-bottom:2px solid var(--line);
+  }
+  .fig-label{flex:none;color:var(--accent-text);font-size:12px;font-weight:600;letter-spacing:.14em;}
+  .fig-txt{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* ---------- 3D stage (PC only) ---------- */
+  .stage-slot{position:absolute;inset:0;}
+  .stage-canvas{display:block;width:100%;height:100%;}
+  .home-stage .stage-canvas{cursor:grab;touch-action:pan-y;}
+  .home-stage .stage-canvas:active{cursor:grabbing;}
+  .stage-hud{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;}
+  .stage-hud.on{opacity:1;}
+  .hud-line{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+  .hud-line line{stroke:var(--ink);stroke-width:1.5;}
+  .hud-dot{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:var(--accent);border:3px solid var(--white);box-shadow:0 0 0 2px var(--ink);}
+  .hud-tag{position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--white);padding:5px 12px 5px 5px;box-shadow:4px 4px 0 var(--accent);white-space:nowrap;}
+  .hud-num{background:var(--accent);color:var(--ink);font-family:var(--num);font-weight:900;font-size:15px;padding:3px 7px;}
+  .hud-txt{font-size:14px;font-weight:600;letter-spacing:.2em;}
+  .stage-fallback{display:none;}
+  .no-webgl .home-stage .stage-fallback{display:block;position:absolute;left:8%;top:6%;width:70%;background:var(--white);padding:6px;transform:rotate(1.5deg);}
+  .stage-fallback img{display:block;width:100%;}
+  .stage-panel{display:none;}
+  .stage-corner{position:absolute;left:14px;top:12px;z-index:2;pointer-events:none;}
+  .stage-cap{
+    position:absolute;left:0;right:0;bottom:0;z-index:2;pointer-events:none;
+    display:flex;align-items:baseline;gap:10px;padding:8px 14px;
+    background:var(--panel);border-top:2px solid var(--line);
+  }
+
+  /* ---------- steps ---------- */
+  .guide{display:grid;grid-template-columns:minmax(0,1fr);}
+  .steps{display:flex;flex-direction:column;padding-block:10px 36px;}
+  .step{display:grid;grid-template-columns:56px minmax(0,1fr);gap:14px;padding-block:28px;border-bottom:2px solid var(--line);scroll-margin-top:130px;}
+  .step:last-child{border-bottom:0;}
+  .step-mark{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .step-num{width:56px;aspect-ratio:1;display:grid;place-items:center;background:var(--accent);color:var(--ink);font-family:var(--num);font-weight:900;font-size:22px;}
+  .step-tag{writing-mode:vertical-rl;font-size:12px;font-weight:600;letter-spacing:.32em;}
+  .step-body{display:flex;flex-direction:column;gap:14px;min-width:0;}
+  .step-label{color:var(--accent-text);}
+  .step-body h2{font-size:21px;font-weight:700;line-height:1.45;letter-spacing:.02em;text-wrap:balance;word-break:auto-phrase;}
+  .step-body > p{font-size:14.5px;font-weight:400;}
+
+  .shot-img{display:block;width:100%;max-width:440px;height:auto;}
+  .photo{width:min(100%,380px);background:var(--white);padding:7px;box-shadow:0 12px 24px -10px rgba(34,35,38,.45);transform:rotate(-1.2deg);}
+  .step:nth-child(even) .photo{transform:rotate(1.2deg);}
+  .photo img{display:block;width:100%;height:auto;}
+
+  .auto-note{display:flex;align-items:baseline;gap:10px;}
+  .auto-note .label{color:var(--accent-text);}
+  .auto-note .jp{font-size:13px;font-weight:600;}
+  .auto-checklist{display:flex;flex-direction:column;border-top:2px solid var(--line);}
+  .auto-item{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px dashed var(--line);font-size:14px;font-weight:600;}
+  .auto-item .tick{flex:none;width:22px;height:22px;padding:4px;background:var(--accent);stroke:var(--ink);}
+
+  .hazard{height:12px;background:var(--hazard);}
+  .branch{margin-top:6px;background:var(--ink);color:var(--white);box-shadow:6px 6px 0 var(--accent);}
+  .branch-inner{padding:16px 18px 20px;}
+  .branch-kicker{display:flex;align-items:center;gap:8px;color:var(--accent);}
+  .branch-kicker .icon{width:18px;height:18px;stroke:var(--accent);flex:none;}
+  .branch-head{margin-top:8px;font-size:15px;font-weight:600;line-height:1.5;word-break:auto-phrase;}
+  .branch ol{margin:12px 0 0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:400;}
+  .branch .photo{width:min(100%,220px);margin-top:16px;transform:rotate(2deg);}
+
+  .device-grid{display:flex;flex-direction:column;gap:14px;}
+  .device-card{
+    display:flex;align-items:center;gap:16px;width:100%;text-align:left;cursor:pointer;
+    background:transparent;border:2px solid var(--line);padding:12px 18px;
+  }
+  .device-card .num{font-family:var(--num);font-weight:900;font-size:34px;line-height:1;}
+  .device-card .text{display:flex;flex-direction:column;gap:1px;}
+  .device-card .name{font-size:15px;font-weight:600;letter-spacing:.06em;}
+  .device-card .sub{font-size:12px;font-weight:400;letter-spacing:.06em;}
+  .device-card[aria-checked="true"]{background:var(--accent);color:var(--ink);box-shadow:6px 6px 0 var(--dark);}
+
+  .checklist{display:flex;flex-direction:column;gap:12px;}
+  .check-item{display:flex;align-items:center;gap:12px;cursor:pointer;border:2px solid var(--line);padding:12px 16px;font-size:14.5px;font-weight:600;}
+  .check-item input{flex:none;width:18px;height:18px;margin:0;accent-color:var(--accent);}
+  .check-item.is-done{background:var(--ink);color:var(--white);}
+
+  .end-note{display:flex;align-items:center;gap:22px;padding-top:8px;}
+  .stamp{flex:none;font-family:var(--num);font-weight:900;font-size:26px;letter-spacing:.04em;color:var(--accent-text);border:4px solid var(--accent-text);padding:4px 12px;transform:rotate(-8deg);}
+  .done-text{font-size:16px;font-weight:700;letter-spacing:.1em;margin-bottom:10px;}
+
+  .section-help{padding:22px 0 44px;border-top:2px solid var(--line);}
+  .section-help h3{font-size:18px;font-weight:700;margin-top:6px;}
+  .section-help p{font-size:14px;line-height:1.8;margin-top:4px;}
+
+  @media (min-width:960px){
+    .home-main{padding-top:48px;}
+    .home-title{font-size:44px;}
+    .home-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:start;}
+    .home-stage{display:block;aspect-ratio:1/1.05;}
+    .fig-bar{display:none;}
+    .guide{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:44px;align-items:start;}
+    .stage-panel{
+      display:block;position:sticky;top:calc(var(--topbar-h,62px) + 24px);
+      height:calc(100vh - var(--topbar-h,62px) - 56px);min-height:420px;margin:32px 0;
+      background:var(--white);border:2px solid var(--line);box-shadow:8px 8px 0 var(--dark);
+    }
+    .step{grid-template-columns:72px minmax(0,1fr);gap:20px;}
+    .step-num{width:72px;font-size:28px;}
+    .device-grid{flex-direction:row;}
+    .device-card{flex:1 1 0;}
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="icon-warn" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.5 21.5 20H2.5L12 3.5Z"/>
+      <path d="M12 9.5v4.2"/>
+      <circle cx="12" cy="16.8" r=".9" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="icon-tick" viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.5 12.5 9.5 17.5 19.5 6.5"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ============ TOP ============ -->
+<section class="view home" id="view-top">
+  <main class="home-main">
+    <h1 class="home-title">A1miniマニュアル</h1>
+    <div class="home-grid">
+      <div class="home-col">
+        <div class="pw">
+          <p class="pw-label">Mac Password</p>
+          <code class="pw-value">Media Labo</code>
+        </div>
+        <nav class="menu" aria-label="操作を選ぶ">
+          <button type="button" class="menu-card" data-view="print">
+            <span class="menu-num">01</span>
+            <span class="menu-text"><span class="menu-en">Print</span><span class="menu-jp">印刷</span></span>
+          </button>
+          <button type="button" class="menu-card" data-view="load">
+            <span class="menu-num">02</span>
+            <span class="menu-text"><span class="menu-en">Load</span><span class="menu-jp">ロード</span></span>
+          </button>
+          <button type="button" class="menu-card" data-view="unload">
+            <span class="menu-num">03</span>
+            <span class="menu-text"><span class="menu-en">Unload</span><span class="menu-jp">アンロード</span></span>
+          </button>
+        </nav>
+      </div>
+      <div class="home-stage">
+        <div class="stage-slot" role="img" aria-label="A1 miniの3Dモデル(ドラッグで回転)"></div>
+        <div class="stage-fallback"><img src="images/load-3.jpg" alt=""></div>
+        <p class="stage-hint">ドラッグで回せます</p>
+      </div>
+    </div>
+  </main>
+  <footer class="home-foot">
+    <div class="home-foot-inner">
+      <h3>うまくいかない時は</h3>
+      <p>操作で困った時は、杉島か朴先生に連絡してください</p>
+    </div>
+  </footer>
+</section>
+
+<!-- ============ 印刷 ============ -->
+<section class="view" id="view-print" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button type="button" class="box-btn" data-view="top">← TOP</button>
+      <span class="topbar-title">PRINT<span class="jp">印刷</span></span>
+      <span class="progress-num"><span class="step-now">01</span>/10</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill"></div></div>
+    <p class="fig-bar"><span class="fig-label">FIG.</span><span class="fig-txt"></span></p>
+  </header>
+
+  <div class="page">
+    <div class="guide">
+      <aside class="stage-panel" aria-hidden="true">
+        <div class="stage-slot"></div>
+        <span class="label stage-corner">3D VIEW</span>
+        <p class="stage-cap"><span class="fig-label">FIG.</span><span class="fig-txt"></span></p>
+      </aside>
+
+      <main class="steps">
+        <article class="step" data-step="1" data-focus="overview">
+          <div class="step-mark"><span class="step-num">01</span><span class="step-tag">転送</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 01 / 10</span>
+            <h2>STLデータをこのMacへ送る</h2>
+            <p>自分のiPhone・Macから、印刷したいSTLファイルをAirDropで共用Macに転送する。受信したファイルは通常「ダウンロード」フォルダに入る。</p>
+            <img class="shot-img" src="images/print-1.jpg" alt="共有メニューのAirDrop" loading="lazy">
+          </div>
+        </article>
+
+        <article class="step" data-step="2" data-focus="overview">
+          <div class="step-mark"><span class="step-num">02</span><span class="step-tag">起動</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 02 / 10</span>
+            <h2>Bambu Studioを起動する</h2>
+            <p>Dockまたはアプリケーション一覧からBambu Studioを開く。</p>
+            <img class="shot-img" src="images/print-2.jpg" alt="DockのBambu Studioアイコン" loading="lazy">
+          </div>
+        </article>
+
+        <article class="step" data-step="3" data-focus="overview">
+          <div class="step-mark"><span class="step-num">03</span><span class="step-tag">準備</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 03 / 10</span>
+            <h2>「準備」タブを開く</h2>
+            <p>画面上部のタブから「準備」を選択する。以降の操作はすべてこのタブの中で行う。</p>
+            <img class="shot-img" src="images/print-3.jpg" alt="準備タブの位置" loading="lazy">
+          </div>
+        </article>
+
+        <article class="step" data-step="4" data-focus="overview">
+          <div class="step-mark"><span class="step-num">04</span><span class="step-tag">配置</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 04 / 10</span>
+            <h2>STLをドラッグ&amp;ドロップする</h2>
+            <p>「ダウンロード」フォルダを開き、STLファイルを準備タブの3Dビューにドラッグ&amp;ドロップする。</p>
+            <img class="shot-img" src="images/print-4.jpg" alt="STLファイルを3Dビューにドラッグ&amp;ドロップ" loading="lazy">
+          </div>
+        </article>
+
+        <article class="step" data-step="5" data-focus="overview">
+          <div class="step-mark"><span class="step-num">05</span><span class="step-tag">確認</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 05 / 10</span>
+            <h2>縮尺・回転を確認する</h2>
+            <p>意図したサイズ・向きになっているか、右側パネルの数値を確認する。ここでズレていると印刷結果が変わる。</p>
+            <img class="shot-img" src="images/print-5.jpg" alt="縮尺・回転パネル" loading="lazy">
+          </div>
+        </article>
+
+        <article class="step" data-step="6" data-focus="overview">
+          <div class="step-mark"><span class="step-num">06</span><span class="step-tag">変換</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 06 / 10</span>
+            <h2>スライスを実行する</h2>
+            <p>右上の「スライス」ボタンを押し、印刷用データに変換する。</p>
+            <img class="shot-img" src="images/print-6.jpg" alt="スライスボタンの位置" loading="lazy">
+            <div class="branch">
+              <div class="hazard" aria-hidden="true"></div>
+              <div class="branch-inner">
+                <p class="branch-kicker"><svg class="icon"><use href="#icon-warn"/></svg><span class="label">CAUTION</span></p>
+                <p class="branch-head">「不動領域があります」と表示されたら</p>
+                <ol>
+                  <li>「サポート」タブを開く</li>
+                  <li>「有効化」にチェックを入れる</li>
+                  <li>もう一度スライスを実行する</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="step" data-step="7" data-focus="overview">
+          <div class="step-mark"><span class="step-num">07</span><span class="step-tag">送信</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 07 / 10</span>
+            <h2>「造形開始」を押す</h2>
+            <p>スライス結果(印刷時間・材料使用量)を確認し、「造形開始」ボタンを押す。</p>
+            <img class="shot-img" src="images/print-7.jpg" alt="造形開始ボタン" loading="lazy">
+          </div>
+        </article>
+
+        <article class="step" data-step="8" data-focus="overview">
+          <div class="step-mark"><span class="step-num">08</span><span class="step-tag">選択</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 08 / 10</span>
+            <h2>機体を選択する</h2>
+            <p>今使うプリンター本体を選ぶ。タップすると選択状態になる。</p>
+            <div class="device-grid" role="radiogroup" aria-label="機体選択">
+              <button type="button" class="device-card" role="radio" aria-checked="true" data-device="1">
+                <span class="num">1</span><span class="text"><span class="name">1号機</span><span class="sub">1gouki</span></span>
+              </button>
+              <button type="button" class="device-card" role="radio" aria-checked="false" data-device="2">
+                <span class="num">2</span><span class="text"><span class="name">2号機</span><span class="sub">2gouki</span></span>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article class="step" data-step="9" data-focus="bed">
+          <div class="step-mark"><span class="step-num">09</span><span class="step-tag">点検</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 09 / 10</span>
+            <h2>最終チェックにチェックを入れる</h2>
+            <p>印刷を始める前に、以下の2項目に必ずチェックを入れる。</p>
+            <div class="checklist" id="finalChecklist">
+              <label class="check-item" for="chk-calib"><input type="checkbox" id="chk-calib">キャリブレーション</label>
+              <label class="check-item" for="chk-level"><input type="checkbox" id="chk-level">自動ベッドレベリング</label>
+            </div>
+          </div>
+        </article>
+
+        <article class="step" data-step="10" data-focus="nozzle">
+          <div class="step-mark"><span class="step-num">10</span><span class="step-tag">開始</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 10 / 10</span>
+            <h2>送信を押す</h2>
+            <img class="shot-img" src="images/print-10.jpg" alt="送信画面" loading="lazy">
+          </div>
+        </article>
+      </main>
+    </div>
+
+    <footer class="section-help">
+      <span class="label">HELP</span>
+      <h3>うまくいかない時は</h3>
+      <p>上記以外のエラーが表示された場合は、杉島か朴先生に連絡してください。</p>
+    </footer>
+  </div>
+</section>
+
+<!-- ============ フィラメントロード ============ -->
+<section class="view" id="view-load" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button type="button" class="box-btn" data-view="top">← TOP</button>
+      <span class="topbar-title">LOAD<span class="jp">フィラメントロード</span></span>
+      <span class="progress-num"><span class="step-now">01</span>/07</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill"></div></div>
+    <p class="fig-bar"><span class="fig-label">FIG.</span><span class="fig-txt"></span></p>
+  </header>
+
+  <div class="page">
+    <div class="guide">
+      <aside class="stage-panel" aria-hidden="true">
+        <div class="stage-slot"></div>
+        <span class="label stage-corner">3D VIEW</span>
+        <p class="stage-cap"><span class="fig-label">FIG.</span><span class="fig-txt"></span></p>
+      </aside>
+
+      <main class="steps">
+        <article class="step" data-step="1" data-focus="screen">
+          <div class="step-mark"><span class="step-num">01</span><span class="step-tag">選択</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 01 / 07</span>
+            <h2>「フィラメント」→「ロード」をタップ</h2>
+            <p>プリンター画面上の「フィラメント」ボタンをタップし、続けて「ロード」ボタンをタップする。</p>
+            <div class="photo"><img src="images/load-1.jpg" alt="フィラメント/ロードボタンの位置" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="2" data-focus="nozzle">
+          <div class="step-mark"><span class="step-num">02</span><span class="step-tag">待機</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 02 / 07</span>
+            <h2>処理が終わるまで待つ</h2>
+            <p>音が鳴るまで待つ。その間、プリンターが自動で以下を行う。</p>
+            <p class="auto-note"><span class="label">AUTO</span><span class="jp">プリンターが自動で行う処理</span></p>
+            <div class="auto-checklist">
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>ノズルを加熱</div>
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>フィラメント位置を確認</div>
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>フィラメントを切る</div>
+            </div>
+            <div class="photo"><img src="images/load-2.jpg" alt="処理待ち画面" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="3" data-focus="spool">
+          <div class="step-mark"><span class="step-num">03</span><span class="step-tag">準備</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 03 / 07</span>
+            <h2>新しいフィラメントをホルダーにセットする</h2>
+            <p>処理を待っている間に、新しいフィラメントをスプールホルダーにセットする。送り出す向きに注意する。</p>
+            <div class="photo"><img src="images/load-3.jpg" alt="フィラメントの向き" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="4" data-focus="inlet">
+          <div class="step-mark"><span class="step-num">04</span><span class="step-tag">挿入</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 04 / 07</span>
+            <h2>フィラメントをチューブの穴に通す</h2>
+            <p>本体側面の穴からフィラメントをチューブに通す。</p>
+            <div class="photo"><img src="images/load-4.jpg" alt="穴にフィラメントを通す" loading="lazy"></div>
+            <div class="branch">
+              <div class="hazard" aria-hidden="true"></div>
+              <div class="branch-inner">
+                <p class="branch-kicker"><svg class="icon"><use href="#icon-warn"/></svg><span class="label">CAUTION</span></p>
+                <p class="branch-head">「フィラメントをツールヘッドまで入れてください」と出たら</p>
+                <ol>
+                  <li>フィラメントを手でつまむ</li>
+                  <li>ノズルのところまで入るように押し込む</li>
+                </ol>
+                <div class="photo"><img src="images/load-4b.jpg" alt="ノズルのところまで押し込む" loading="lazy"></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="step" data-step="5" data-focus="tube">
+          <div class="step-mark"><span class="step-num">05</span><span class="step-tag">送込</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 05 / 07</span>
+            <h2>フィラメントを送り込む</h2>
+            <p>フィラメントが曲がったり折れたりしないような力加減で、奥へ送り込む。</p>
+            <div class="photo"><img src="images/load-5.jpg" alt="フィラメントを送り込む様子" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="6" data-focus="nozzle">
+          <div class="step-mark"><span class="step-num">06</span><span class="step-tag">反復</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 06 / 07</span>
+            <h2>ノズルから出てくるまで繰り返す</h2>
+            <p>入れ替えたフィラメントがノズルの先から出てくるまで、送り込みを繰り返す。</p>
+            <div class="photo"><img src="images/load-6.jpg" alt="ノズル先端" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="7" data-focus="screen">
+          <div class="step-mark"><span class="step-num">07</span><span class="step-tag">完了</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 07 / 07</span>
+            <h2>完了</h2>
+            <p>プリンター画面の6項目すべてにチェックが入っていれば、ロードは完了。</p>
+            <div class="photo"><img src="images/load-7.jpg" alt="完了画面" loading="lazy"></div>
+            <div class="end-note">
+              <span class="stamp">DONE</span>
+              <div>
+                <p class="done-text">ロード完了</p>
+                <button type="button" class="box-btn" data-view="top">← TOPへ戻る</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ============ フィラメントアンロード ============ -->
+<section class="view" id="view-unload" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button type="button" class="box-btn" data-view="top">← TOP</button>
+      <span class="topbar-title">UNLOAD<span class="jp">フィラメントアンロード</span></span>
+      <span class="progress-num"><span class="step-now">01</span>/05</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill"></div></div>
+    <p class="fig-bar"><span class="fig-label">FIG.</span><span class="fig-txt"></span></p>
+  </header>
+
+  <div class="page">
+    <div class="guide">
+      <aside class="stage-panel" aria-hidden="true">
+        <div class="stage-slot"></div>
+        <span class="label stage-corner">3D VIEW</span>
+        <p class="stage-cap"><span class="fig-label">FIG.</span><span class="fig-txt"></span></p>
+      </aside>
+
+      <main class="steps">
+        <article class="step" data-step="1" data-focus="screen">
+          <div class="step-mark"><span class="step-num">01</span><span class="step-tag">選択</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 01 / 05</span>
+            <h2>「フィラメント」ボタンをタップ</h2>
+            <p>プリンター画面上の「フィラメント」ボタンをタップする。</p>
+            <div class="photo"><img src="images/unload-1.jpg" alt="フィラメントボタンの位置" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="2" data-focus="screen">
+          <div class="step-mark"><span class="step-num">02</span><span class="step-tag">選択</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 02 / 05</span>
+            <h2>「アンロード」ボタンをタップ</h2>
+            <p>表示されたメニューから「アンロード」を選ぶ。</p>
+            <div class="photo"><img src="images/unload-2.jpg" alt="アンロードボタンの位置" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="3" data-focus="nozzle">
+          <div class="step-mark"><span class="step-num">03</span><span class="step-tag">待機</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 03 / 05</span>
+            <h2>処理が終わるまで待つ</h2>
+            <p>音が鳴るまで待つ。その間、プリンターが自動で以下を行う。</p>
+            <p class="auto-note"><span class="label">AUTO</span><span class="jp">プリンターが自動で行う処理</span></p>
+            <div class="auto-checklist">
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>ノズルを加熱</div>
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>フィラメント位置を確認</div>
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>フィラメントを切る</div>
+              <div class="auto-item"><svg class="tick"><use href="#icon-tick"/></svg>現フィラメントを引き戻す</div>
+            </div>
+            <div class="photo"><img src="images/unload-3.jpg" alt="処理待ち画面" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="4" data-focus="inlet">
+          <div class="step-mark"><span class="step-num">04</span><span class="step-tag">手動</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 04 / 05</span>
+            <h2>チューブからフィラメントを引き戻す</h2>
+            <p>チューブから出ているフィラメントを手で引き戻し、ロールに綺麗に巻き戻す。</p>
+            <div class="photo"><img src="images/unload-4.jpg" alt="ロールに巻き戻す様子" loading="lazy"></div>
+          </div>
+        </article>
+
+        <article class="step" data-step="5" data-focus="spool">
+          <div class="step-mark"><span class="step-num">05</span><span class="step-tag">完了</span></div>
+          <div class="step-body">
+            <span class="label step-label">STEP 05 / 05</span>
+            <h2>ロールを取り出す</h2>
+            <p>ホルダーからロールを取り出して完了。</p>
+            <div class="photo"><img src="images/unload-5.jpg" alt="ロールを取り出す様子" loading="lazy"></div>
+            <div class="end-note">
+              <span class="stamp">DONE</span>
+              <div>
+                <p class="done-text">アンロード完了</p>
+                <button type="button" class="box-btn" data-view="top">← TOPへ戻る</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </main>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  root.classList.add('three-pending');
+  setTimeout(function(){
+    if(root.classList.contains('three-pending')){
+      root.classList.remove('three-pending');
+      root.classList.add('no-webgl');
+    }
+  }, 9000);
+
+  var views = {
+    top: document.getElementById('view-top'),
+    print: document.getElementById('view-print'),
+    load: document.getElementById('view-load'),
+    unload: document.getElementById('view-unload')
+  };
+  window.__a1 = {view:'top', stepEl:null};
+  var currentObserver = null;
+
+  function emit(name, detail){ document.dispatchEvent(new CustomEvent(name, {detail:detail})); }
+  function setStep(viewEl, el){
+    window.__a1.stepEl = el;
+    var txt = el.querySelector('.step-num').textContent + ' — ' + el.querySelector('h2').textContent;
+    viewEl.querySelectorAll('.fig-txt').forEach(function(t){ t.textContent = txt; });
+    emit('a1:step', {el:el});
+  }
+
+  function measureTopbar(viewEl){
+    var bar = viewEl.querySelector('.topbar');
+    if(bar) root.style.setProperty('--topbar-h', bar.offsetHeight + 'px');
+  }
+
+  function initProgress(viewEl){
+    if(currentObserver){ currentObserver.disconnect(); currentObserver = null; }
+    var steps = viewEl.querySelectorAll('.step');
+    var stepNow = viewEl.querySelector('.step-now');
+    if(!steps.length || !stepNow) return;
+    stepNow.textContent = '01';
+    setStep(viewEl, steps[0]);
+    if('IntersectionObserver' in window){
+      currentObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(e.isIntersecting){
+            stepNow.textContent = ('0' + e.target.getAttribute('data-step')).slice(-2);
+            setStep(viewEl, e.target);
+          }
+        });
+      }, {rootMargin:'-45% 0px -45% 0px'});
+      steps.forEach(function(s){ currentObserver.observe(s); });
+    }
+  }
+
+  function updateFill(){
+    var active = document.querySelector('.view:not([hidden])');
+    var fill = active && active.querySelector('.progress-fill');
+    if(!fill) return;
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - doc.clientHeight;
+    fill.style.width = (max > 0 ? (doc.scrollTop / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', updateFill, {passive:true});
+  window.addEventListener('resize', function(){
+    var active = document.querySelector('.view:not([hidden])');
+    if(active) measureTopbar(active);
+  });
+
+  function switchView(name){
+    if(!views[name]) return;
+    Object.keys(views).forEach(function(k){ views[k].hidden = (k !== name); });
+    window.scrollTo(0,0);
+    window.__a1 = {view:name, stepEl:null};
+    measureTopbar(views[name]);
+    emit('a1:view', {view:name});
+    if(name !== 'top'){ initProgress(views[name]); }
+    updateFill();
+  }
+
+  document.querySelectorAll('[data-view]').forEach(function(el){
+    el.addEventListener('click', function(){ switchView(el.getAttribute('data-view')); });
+  });
+
+  var cards = document.querySelectorAll('.device-card');
+  cards.forEach(function(card){
+    card.addEventListener('click', function(){
+      cards.forEach(function(c){ c.setAttribute('aria-checked','false'); });
+      card.setAttribute('aria-checked','true');
+    });
+  });
+
+  document.querySelectorAll('#finalChecklist .check-item').forEach(function(item){
+    var box = item.querySelector('input');
+    box.addEventListener('change', function(){ item.classList.toggle('is-done', box.checked); });
+  });
+})();
+</script>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const root = document.documentElement;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let renderer;
+try{
+  renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, powerPreference:'low-power'});
+}catch(err){
+  root.classList.remove('three-pending');
+  root.classList.add('no-webgl');
+  throw err;
+}
+root.classList.remove('three-pending');
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x000000, 0);
+const canvas = renderer.domElement;
+canvas.className = 'stage-canvas';
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 40);
+
+const PAL = {cream:'#F2F2F0', white:'#FFFFFF', blue:'#3A3D42', ink:'#1F2023', deep:'#2E3033', steel:'#C4C6C9', tube:'#E4E6E8', red:'#00AE42', redDeep:'#00692A'};
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+const LIGHT_WORLD = new THREE.Vector3(0.55, 1.0, 0.75).normalize();
+const lightView = new THREE.Vector3();
+const res = new THREE.Vector2(1, 1);
+const shared = {uLight:{value:lightView}, uCell:{value:5.5 * dpr}, uStep:{value:0}, uRes:{value:res}};
+
+const HALFTONE = `
+float halftone(float shade, float cell){
+  vec2 p = gl_FragCoord.xy / cell;
+  p = vec2(p.x - p.y, p.x + p.y) * 0.70710678;
+  float d = length(fract(p) - 0.5);
+  float r = sqrt(clamp(shade, 0.0, 1.0)) * 0.64;
+  float aa = fwidth(d);
+  return 1.0 - smoothstep(r - aa, r + aa, d);
+}`;
+
+const HT_VERT = 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const HT_FRAG = `
+uniform vec3 uBase; uniform vec3 uDot; uniform vec3 uHi; uniform vec3 uHiDot;
+uniform float uH; uniform float uPulse; uniform float uFloor; uniform vec3 uLight; uniform float uCell;
+varying vec3 vN;
+${HALFTONE}
+void main(){
+  float ndl = max(dot(normalize(vN), uLight), 0.0);
+  float shade = max(1.0 - (ndl * 0.95 + 0.36), uFloor + uH * uPulse * 0.28);
+  float m = halftone(shade, uCell);
+  gl_FragColor = vec4(mix(mix(uBase, uHi, uH), mix(uDot, uHiDot, uH), m), 1.0);
+  #include <colorspace_fragment>
+}`;
+
+const LOOK = {
+  shell:[PAL.cream, PAL.blue, 0.0],
+  white:[PAL.white, PAL.blue, 0.0],
+  dark:[PAL.deep, PAL.ink, 0.3],
+  steel:[PAL.steel, PAL.blue, 0.12],
+  tube:[PAL.tube, PAL.blue, 0.05],
+  alu:['#D3D6DA', PAL.blue, 0.1],
+  plate:['#4A4541', PAL.ink, 0.35],
+  gtube:['#A9ABAE', PAL.ink, 0.12],
+  gold:['#C9A24B', '#5A4418', 0.15]
+};
+function halftone(look){
+  const [base, dot, floor] = LOOK[look];
+  return new THREE.ShaderMaterial({
+    uniforms:{
+      uBase:{value:new THREE.Color(base)}, uDot:{value:new THREE.Color(dot)},
+      uHi:{value:new THREE.Color(PAL.red)}, uHiDot:{value:new THREE.Color(PAL.redDeep)},
+      uH:{value:0}, uPulse:{value:0}, uFloor:{value:floor},
+      uLight:shared.uLight, uCell:shared.uCell
+    },
+    vertexShader:HT_VERT, fragmentShader:HT_FRAG
+  });
+}
+
+const hullMat = new THREE.ShaderMaterial({
+  uniforms:{thickness:{value:0.006}},
+  vertexShader:'uniform float thickness; void main(){ vec3 p = position + normal * thickness; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+  fragmentShader:'void main(){ gl_FragColor = vec4(0.12, 0.11, 0.1, 1.0); }',
+  side:THREE.BackSide
+});
+
+const model = new THREE.Group();
+model.position.set(0.03, 0, 0.07);
+scene.add(model);
+const parts = {};
+const edgeSrc = [];
+const reg = (key, mesh) => { if(key) (parts[key] ||= []).push(mesh); };
+
+// model is authored in 10cm units, then scaled by S so the stage framing stays the same
+const S = 0.4;
+const U = p => p.map(v => v * S);
+function hull(mesh, t){
+  const mat = t ? hullMat.clone() : hullMat;
+  if(t) mat.uniforms.thickness.value = t;
+  mesh.add(new THREE.Mesh(mesh.geometry, mat));
+}
+function box(w, h, d, look, pos, key, rx = 0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w * S, h * S, d * S), halftone(look));
+  m.position.set(...U(pos)); m.rotation.x = rx;
+  model.add(m); reg(key, m); edgeSrc.push(m); return m;
+}
+function cyl(rTop, rBot, h, look, pos, axis, key){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop * S, rBot * S, h * S, 40), halftone(look));
+  m.position.set(...U(pos));
+  if(axis === 'x') m.rotation.z = Math.PI / 2;
+  if(axis === 'z') m.rotation.x = Math.PI / 2;
+  hull(m); model.add(m); reg(key, m); edgeSrc.push(m); return m;
+}
+function tube(points, r, look, key, t = 0.004, radial = 10){
+  const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...U(p))));
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 90, r * S, radial), halftone(look));
+  hull(m, t); model.add(m); reg(key, m); return m;
+}
+function decal(parent, w, h, z, draw, y = 0){
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = Math.round(256 * h / w);
+  const g = c.getContext('2d');
+  draw(g, c.width, c.height);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w * S, h * S), new THREE.MeshBasicMaterial({map:tex, transparent:true}));
+  p.position.set(0, y * S, z * S + 0.002);
+  parent.add(p);
+  return {canvas:c, tex};
+}
+
+// --- base: bed housing (left) + electronics body (right) ---
+box(1.9, 0.5, 3.0, 'shell', [-0.65, 0.25, 0.1], 'base');
+box(0.3, 0.06, 2.8, 'alu', [-0.65, 0.53, 0.1]);
+box(1.05, 0.58, 2.5, 'shell', [0.78, 0.29, -0.15], 'base');
+
+// --- touchscreen: sloped slab at the front of the right body ---
+box(1.0, 0.36, 0.7, 'shell', [0.78, 0.18, 1.4], 'screen');
+const screenSlab = box(1.0, 0.64, 0.16, 'shell', [0.78, 0.5, 1.58], 'screen', -0.8);
+const glassCanvas = document.createElement('canvas');
+glassCanvas.width = 256; glassCanvas.height = 160;
+const scrTex = new THREE.CanvasTexture(glassCanvas);
+scrTex.colorSpace = THREE.SRGBColorSpace;
+const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.92 * S, 0.56 * S), new THREE.MeshBasicMaterial({map:scrTex}));
+glass.position.z = 0.08 * S + 0.002;
+screenSlab.add(glass);
+function drawScreen(hot){
+  const g = glassCanvas.getContext('2d');
+  g.fillStyle = '#1B1C1E'; g.fillRect(0, 0, 256, 160);
+  g.fillStyle = '#2B2D31'; g.fillRect(64, 12, 128, 100);
+  g.fillStyle = '#3A3D42'; g.fillRect(76, 20, 104, 56);
+  g.fillStyle = '#DDE3EA'; g.fillRect(112, 34, 32, 26);
+  for(let i = 0; i < 4; i++){
+    g.fillStyle = (hot && i === 0) ? '#00AE42' : '#34363A';
+    g.fillRect(78 + i * 26, 84, 22, 22);
+  }
+  g.fillStyle = '#C9CCD0'; g.font = '600 13px Archivo, Arial, sans-serif'; g.textAlign = 'center';
+  g.fillText('Bambu Lab', 128, 140);
+  scrTex.needsUpdate = true;
+}
+drawScreen(false);
+
+// --- Z tower (aluminium) with white cap ---
+box(0.55, 3.0, 0.55, 'alu', [0.25, 2.05, -0.9], 'tower');
+box(0.06, 2.9, 0.02, 'dark', [0.47, 2.05, -0.615]);
+box(0.6, 0.26, 0.6, 'shell', [0.25, 3.68, -0.9], 'tower');
+
+// --- X carriage block ("Bambu Lab A1 mini") + handle ---
+const carriage = box(0.95, 0.8, 0.8, 'shell', [0.62, 2.3, -0.85], 'arm');
+decal(carriage, 0.8, 0.4, 0.4, (g, w, h) => {
+  g.fillStyle = '#3A3D42';
+  g.font = '700 22px Archivo, Arial, sans-serif'; g.fillText('Bambu', 10, 48); g.fillText('Lab', 10, 74);
+  g.font = '800 64px Archivo, Arial, sans-serif'; g.fillText('A1', 110, 78);
+  g.font = '700 16px Archivo, Arial, sans-serif'; g.fillText('mini', 196, 76);
+});
+box(0.1, 0.25, 0.1, 'steel', [0.62, 2.82, -0.7]);
+box(0.5, 0.1, 0.12, 'steel', [0.55, 2.97, -0.7]);
+
+// --- X beam extending left ---
+box(1.75, 0.26, 0.24, 'alu', [-0.55, 2.3, -0.62], 'arm');
+box(1.7, 0.04, 0.01, 'dark', [-0.55, 2.3, -0.495]);
+
+// --- toolhead ---
+const head = box(0.75, 0.95, 0.62, 'shell', [-1.4, 2.25, -0.3], 'nozzle');
+decal(head, 0.7, 0.2, 0.31, (g, w, h) => {
+  g.fillStyle = '#3A3D42'; g.font = '700 30px Archivo, Arial, sans-serif'; g.textAlign = 'center';
+  g.fillText('Bambu Lab', w / 2, 50);
+}, -0.3);
+cyl(0.13, 0.13, 0.04, 'gold', [-1.4, 2.42, 0.03], 'z', 'nozzle');
+cyl(0.055, 0.055, 0.06, 'dark', [-1.4, 2.42, 0.045], 'z', 'nozzle');
+box(0.14, 0.22, 0.14, 'shell', [-1.52, 2.84, -0.3], 'nozzle');
+box(0.12, 0.12, 0.12, 'dark', [-1.25, 2.79, -0.32], 'nozzle');
+box(0.62, 0.34, 0.55, 'dark', [-1.4, 1.62, -0.3], 'nozzle');
+box(0.22, 0.12, 0.01, 'gold', [-1.4, 1.64, -0.02], 'nozzle');
+cyl(0.03, 0.08, 0.14, 'steel', [-1.4, 1.38, -0.25], null, 'nozzle');
+
+// --- bed ---
+box(1.5, 0.1, 1.5, 'steel', [-0.5, 0.62, 0.3], 'bed');
+box(1.8, 0.04, 1.8, 'plate', [-0.5, 0.7, 0.3], 'bed');
+box(0.5, 0.05, 0.12, 'white', [-0.5, 0.66, 1.25], 'bed');
+
+// --- spool behind the tower, facing front ---
+cyl(0.07, 0.07, 0.8, 'shell', [0.45, 1.95, -1.45], 'z', 'spool');
+cyl(0.62, 0.62, 0.6, 'white', [0.55, 1.95, -1.7], 'z', 'spool');
+cyl(0.25, 0.25, 0.66, 'shell', [0.55, 1.95, -1.7], 'z', 'spool');
+cyl(1.0, 1.0, 0.05, 'white', [0.55, 1.95, -1.38], 'z', 'spool');
+cyl(1.0, 1.0, 0.05, 'white', [0.55, 1.95, -2.02], 'z', 'spool');
+
+// --- filament inlet on the carriage + strand from the spool ---
+box(0.12, 0.16, 0.12, 'steel', [1.14, 2.62, -0.75], 'inlet');
+tube([[1.25, 2.62, -1.6], [1.32, 2.68, -1.2], [1.18, 2.6, -0.85]], 0.012, 'white', 'inlet', 0.003);
+
+// --- PTFE tube (grey) and cable (black) arching to the toolhead ---
+tube([[1.14, 2.7, -0.75], [1.2, 3.4, -0.75], [0.6, 4.25, -0.6], [-0.5, 4.3, -0.45], [-1.35, 3.6, -0.3], [-1.52, 2.95, -0.3]], 0.045, 'gtube', 'tube');
+tube([[0.62, 2.72, -0.9], [0.5, 3.7, -0.9], [-0.2, 4.45, -0.7], [-1.0, 4.1, -0.45], [-1.28, 3.3, -0.32], [-1.25, 2.85, -0.32]], 0.05, 'dark', null);
+
+// --- drag chain from carriage down to the body ---
+tube([[0.62, 1.9, -0.6], [0.75, 1.3, -0.35], [0.95, 0.75, -0.15], [1.15, 0.62, 0.25], [1.25, 0.6, 0.55]], 0.11, 'white', null, 0.004, 4);
+
+// sketchy, misregistered outlines (all edges merged, jittered in the shader)
+{
+  const pos = [], dir = [], side = [], seed = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  for(const m of edgeSrc){
+    m.updateMatrix();
+    const eg = new THREE.EdgesGeometry(m.geometry, 28);
+    const p = eg.attributes.position;
+    for(let i = 0; i < p.count; i += 2){
+      a.fromBufferAttribute(p, i).applyMatrix4(m.matrix);
+      b.fromBufferAttribute(p, i + 1).applyMatrix4(m.matrix);
+      d.subVectors(b, a).normalize();
+      pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      dir.push(d.x, d.y, d.z, d.x, d.y, d.z);
+      side.push(-1, 1);
+      seed.push(Math.random() * 100, Math.random() * 100);
+    }
+    eg.dispose();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('dir', new THREE.Float32BufferAttribute(dir, 3));
+  g.setAttribute('side', new THREE.Float32BufferAttribute(side, 1));
+  g.setAttribute('seed', new THREE.Float32BufferAttribute(seed, 1));
+
+  const SK_VERT = `
+attribute vec3 dir; attribute float side; attribute float seed;
+uniform float uStep; uniform float uAmp; uniform float uOver; uniform float uSeed; uniform vec2 uPx; uniform vec2 uRes;
+float h(float n){ return fract(sin(n) * 43758.5453); }
+void main(){
+  float s = seed + uSeed + uStep * 7.31;
+  vec3 j = vec3(h(s), h(s + 1.7), h(s + 3.3)) - 0.5;
+  vec3 p = position + j * uAmp + dir * side * uOver * (0.35 + h(s + 5.9));
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  gl_Position.xy += uPx / uRes * 2.0 * gl_Position.w;
+  gl_Position.z -= 0.002 * gl_Position.w;
+}`;
+  const SK_FRAG = `
+uniform vec3 uColor; uniform float uAlpha;
+void main(){
+  gl_FragColor = vec4(uColor, uAlpha);
+  #include <colorspace_fragment>
+}`;
+  [
+    {color:PAL.ink, amp:0.004, over:0.03, seed:0, px:[0, 0], alpha:1},
+    {color:PAL.ink, amp:0.007, over:0.05, seed:31, px:[0.6, -0.4], alpha:0.55},
+    {color:'#8E949B', amp:0.008, over:0.07, seed:57, px:[3.2, -2.2], alpha:0.85},
+    {color:PAL.red, amp:0.008, over:0.06, seed:83, px:[-2.4, 2.8], alpha:0.75}
+  ].forEach(L => {
+    const mat = new THREE.ShaderMaterial({
+      uniforms:{
+        uStep:shared.uStep, uRes:shared.uRes,
+        uAmp:{value:L.amp}, uOver:{value:L.over}, uSeed:{value:L.seed},
+        uPx:{value:new THREE.Vector2(...L.px)}, uColor:{value:new THREE.Color(L.color)}, uAlpha:{value:L.alpha}
+      },
+      vertexShader:SK_VERT, fragmentShader:SK_FRAG, transparent:L.alpha < 1, depthWrite:false
+    });
+    const lines = new THREE.LineSegments(g, mat);
+    lines.frustumCulled = false;
+    model.add(lines);
+  });
+}
+
+// halftone floor shadow
+{
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{uCell:shared.uCell, uDot:{value:new THREE.Color(PAL.blue)}},
+    vertexShader:'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader:`
+uniform float uCell; uniform vec3 uDot; varying vec2 vUv;
+${HALFTONE}
+void main(){
+  float shade = (1.0 - smoothstep(0.0, 0.5, length((vUv - 0.5) * vec2(1.0, 1.25)))) * 0.6;
+  float m = halftone(shade, uCell);
+  if(m < 0.02) discard;
+  gl_FragColor = vec4(uDot, m * 0.85);
+  #include <colorspace_fragment>
+}`,
+    transparent:true, depthWrite:false
+  });
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.2), mat);
+  shadow.rotation.x = -Math.PI / 2; shadow.position.set(-0.05, 0.001, -0.05);
+  model.add(shadow);
+}
+
+const V = (x, y, z) => new THREE.Vector3(x * S, y * S, z * S);
+const PRESETS = {
+  overview:{pos:new THREE.Vector3(-2.05, 1.7, 3.25), look:new THREE.Vector3(0, 0.84, 0), world:true},
+  screen:{pos:V(2.0, 2.3, 4.2), look:V(0.75, 0.8, 1.4)},
+  nozzle:{pos:V(-2.8, 2.4, 2.2), look:V(-1.3, 1.9, -0.3)},
+  spool:{pos:V(4.4, 2.9, 1.9), look:V(0.7, 1.95, -1.6)},
+  inlet:{pos:V(3.0, 3.4, 1.2), look:V(1.0, 2.55, -0.8)},
+  tube:{pos:V(-1.0, 4.2, 4.2), look:V(-0.2, 3.3, -0.5)},
+  bed:{pos:V(-1.2, 3.6, 3.8), look:V(-0.45, 0.8, 0.2)}
+};
+const ANCHORS = {
+  screen:V(0.78, 0.62, 1.62),
+  nozzle:V(-1.4, 1.38, -0.2),
+  spool:V(0.95, 2.3, -1.35),
+  inlet:V(1.18, 2.62, -0.72),
+  tube:V(-0.3, 4.3, -0.5),
+  bed:V(-0.45, 0.74, 0.7)
+};
+
+// HUD callout
+const hud = document.createElement('div');
+hud.className = 'stage-hud';
+hud.innerHTML = '<svg class="hud-line"><line x1="0" y1="0" x2="0" y2="0"/></svg><span class="hud-dot"></span><div class="hud-tag"><span class="hud-num"></span><span class="hud-txt"></span></div>';
+const hudLine = hud.querySelector('line');
+const hudDot = hud.querySelector('.hud-dot');
+const hudTag = hud.querySelector('.hud-tag');
+const hudNum = hud.querySelector('.hud-num');
+const hudTxt = hud.querySelector('.hud-txt');
+
+const state = {mode:'top', focus:'overview', label:false, dragging:false};
+let slot = null;
+let fit = 1;
+let px = 0;
+
+const ro = new ResizeObserver(resize);
+function resize(){
+  if(!slot) return;
+  const w = slot.clientWidth, h = slot.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w, h, false);
+  res.set(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  fit = camera.aspect < 1 ? 1 / camera.aspect : 1;
+}
+
+function mount(view){
+  const s = document.querySelector('#view-' + view + ' .stage-slot');
+  if(!s) return;
+  if(slot) ro.unobserve(slot);
+  slot = s;
+  slot.appendChild(canvas);
+  slot.appendChild(hud);
+  ro.observe(slot);
+  resize();
+  state.mode = view;
+  if(view === 'top'){ state.focus = 'overview'; state.label = false; drawScreen(false); }
+}
+
+function setStep(el){
+  if(!el) return;
+  const f = el.dataset.focus;
+  state.focus = PRESETS[f] ? f : 'overview';
+  state.label = state.focus !== 'overview';
+  const num = el.querySelector('.step-num').textContent;
+  const tag = el.querySelector('.step-tag').textContent;
+  hudNum.textContent = num;
+  hudTxt.textContent = tag;
+  drawScreen(state.focus === 'screen');
+}
+
+document.addEventListener('a1:view', e => mount(e.detail.view));
+document.addEventListener('a1:step', e => setStep(e.detail.el));
+
+canvas.addEventListener('pointerdown', e => {
+  if(state.mode !== 'top') return;
+  state.dragging = true; px = e.clientX;
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  if(!state.dragging) return;
+  model.rotation.y += (e.clientX - px) * 0.01; px = e.clientX;
+});
+['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { state.dragging = false; }));
+
+const camPos = PRESETS.overview.pos.clone();
+const camLook = PRESETS.overview.look.clone();
+const tPos = new THREE.Vector3(), tLook = new THREE.Vector3(), tmp = new THREE.Vector3();
+
+function placeHud(){
+  if(!state.label || !slot){ hud.classList.remove('on'); return; }
+  const w = slot.clientWidth, h = slot.clientHeight;
+  const v = model.localToWorld(ANCHORS[state.focus].clone()).project(camera);
+  if(v.z > 1){ hud.classList.remove('on'); return; }
+  const x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * h;
+  const tw = hudTag.offsetWidth, th = hudTag.offsetHeight;
+  let lx = x > w * 0.55 ? x - 44 - tw : x + 44;
+  let ly = y - 62 - th / 2;
+  lx = Math.max(10, Math.min(w - tw - 10, lx));
+  ly = Math.max(34, Math.min(h - th - 40, ly));
+  hudTag.style.transform = 'translate(' + lx + 'px,' + ly + 'px)';
+  hudDot.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+  hudLine.setAttribute('x1', x); hudLine.setAttribute('y1', y);
+  hudLine.setAttribute('x2', lx < x ? lx + tw : lx); hudLine.setAttribute('y2', ly + th / 2);
+  hud.classList.add('on');
+}
+
+let last = performance.now();
+renderer.setAnimationLoop(now => {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  if(!slot || slot.clientWidth === 0){ hud.classList.remove('on'); return; }
+  const ease = reduceMotion ? 1 : 1 - Math.exp(-dt * 3);
+  const focused = state.focus !== 'overview';
+
+  if(!focused){
+    if(!state.dragging && !reduceMotion) model.rotation.y += dt * 0.22;
+  }else{
+    const home = Math.round(model.rotation.y / (Math.PI * 2)) * Math.PI * 2;
+    model.rotation.y += (home - model.rotation.y) * (reduceMotion ? 1 : 1 - Math.exp(-dt * 4));
+  }
+
+  const p = PRESETS[state.focus];
+  tPos.copy(p.pos); tLook.copy(p.look);
+  if(!p.world){ model.localToWorld(tPos); model.localToWorld(tLook); }
+  tmp.subVectors(tPos, tLook).multiplyScalar(fit);
+  tPos.copy(tLook).add(tmp);
+  camPos.lerp(tPos, ease); camLook.lerp(tLook, ease);
+  camera.position.copy(camPos); camera.lookAt(camLook);
+  camera.updateMatrixWorld();
+  lightView.copy(LIGHT_WORLD).transformDirection(camera.matrixWorldInverse);
+  shared.uStep.value = reduceMotion ? 0 : Math.floor(now / 125);
+
+  const pulse = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 260);
+  for(const key in parts){
+    const on = key === state.focus;
+    for(const m of parts[key]){
+      const u = m.material.uniforms;
+      u.uH.value += ((on ? 1 : 0) - u.uH.value) * ease;
+      u.uPulse.value = pulse;
+    }
+  }
+
+  renderer.render(scene, camera);
+  placeHud();
+});
+
+const init = window.__a1 || {view:'top'};
+mount(init.view);
+if(init.stepEl) setStep(init.stepEl);
+</script>
+</body>
+</html>
