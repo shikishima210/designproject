@@ -184,7 +184,7 @@ tr.void td.keep{text-decoration:none}
 "use strict";
 // Firebase project that stores everything (see README). The values are not secret; firestore.rules guards the data.
 // Empty = save in this browser only.
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = { apiKey: "AIzaSyBTyZBRvU015YN518yqX5vldnJmPzdgEy4", authDomain: "decolabo-pos.firebaseapp.com", projectId: "decolabo-pos", storageBucket: "decolabo-pos.firebasestorage.app", messagingSenderId: "976365956375", appId: "1:976365956375:web:0f2688508d1cccfe5c1b52" };
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const yen = n => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
