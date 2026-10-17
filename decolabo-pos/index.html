@@ -775,8 +775,17 @@ async function exportCsv() {
   const csv = "﻿" + rows.map(r => r.map(q).join(",")).join("\r\n");
   let dl = null;
   try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch {}
-  if (!dl) { toast("この画面ではファイル保存が使えません"); return; }
-  try { await dl.save({ filename: `decolabo-sales-${new Date().toISOString().slice(0, 10)}.csv`, data: csv }); }
+  const filename = `decolabo-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+  if (!dl) {
+    try {
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { toast("CSVを保存できませんでした"); }
+    return;
+  }
+  try { await dl.save({ filename, data: csv }); }
   catch (x) { if (!x || x.code !== "declined") toast("CSVを保存できませんでした"); }
 }
 })();
