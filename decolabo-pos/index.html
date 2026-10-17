@@ -69,7 +69,7 @@ nav button:hover{background:rgb(255 255 255 / .6);color:var(--fg)}
 nav button[aria-current="page"]{background:var(--accent);color:var(--accent-ink);font-weight:700}
 .who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 .pill{display:inline-block;font-size:11px;border-radius:999px;padding:1px 8px;border:1px solid currentColor;line-height:1.6}
-.pill.cloud,.pill.sheet{color:var(--fg)} .pill.local,.pill.off{color:var(--warn)}
+.pill.cloud{color:var(--fg)} .pill.local{color:var(--warn)}
 .banner{background:var(--bad-soft);color:var(--fg);font-size:13px;padding-block:8px}
 main{padding-block:16px 96px}
 
@@ -164,8 +164,6 @@ tr.void td.keep{text-decoration:none}
 }
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.prod:active{transform:none}}
-.connect{display:grid;gap:8px}
-.handoff{display:grid;gap:8px;border-top:1px solid var(--line, #e3e6f3);padding-top:14px}
 </style>
 
 <div id="app">
@@ -184,6 +182,9 @@ tr.void td.keep{text-decoration:none}
 <script>
 (() => {
 "use strict";
+// Firebase project that stores everything (see README). The values are not secret; firestore.rules guards the data.
+// Empty = save in this browser only.
+const FIREBASE_CONFIG = null;
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const yen = n => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
@@ -240,103 +241,28 @@ async function hashPw(salt, pw) {
   return "fnv:" + (h >>> 0).toString(16);
 }
 
-/* ---------- storage: claude.ai db, a Google Sheet, or this device only ---------- */
-// A connection link carries the sheet URL and pass phrase in the hash so it never reaches a server log.
-function readConnectHash() {
-  const m = location.hash.match(/^#connect=(.+)$/);
-  if (!m) return null;
-  try { const c = JSON.parse(decodeURIComponent(m[1])); if (c && c.u && c.k) return { url: c.u, key: c.k }; } catch {}
-  return null;
-}
-function connectLink(cfg) {
-  return location.origin + location.pathname + "#connect=" + encodeURIComponent(JSON.stringify({ u: cfg.url, k: cfg.key }));
-}
-async function callSheet(cfg, payload) {
-  let res;
-  try { res = await fetch(cfg.url, { method: "POST", body: JSON.stringify(Object.assign({ key: cfg.key }, payload)) }); }
-  catch { throw { code: "unavailable" }; }
-  let j; try { j = await res.json(); } catch { throw { code: "unavailable" }; }
-  if (!j.ok) throw { code: j.error === "bad_key" ? "bad_key" : j.error || "error" };
-  return j;
-}
-
-const Sheet = {
-  cfg: null, rev: null, online: false, docs: {}, sales: [], outbox: [], timer: null, polling: false, salesCb: null,
-  start(cfg) {
-    this.cfg = cfg;
-    const cache = ls.get("decolabo.sheetCache", null);
-    if (cache) { this.docs = cache.docs || {}; this.sales = cache.sales || []; this.ready = true; }
-    this.outbox = ls.get("decolabo.outbox", []);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) this.poll(); });
-    addEventListener("online", () => this.poll());
-    this.poll();
-  },
-  schedule() { clearTimeout(this.timer); this.timer = setTimeout(() => this.poll(), document.hidden ? 30000 : 5000); },
-  async poll() {
-    if (this.polling) return; this.polling = true;
-    try {
-      await this.flush();
-      const j = await callSheet(this.cfg, { op: "sync", since: this.rev });
-      this.setOnline(true);
-      if (!j.same) {
-        this.rev = j.rev;
-        const docs = j.docs || {};
-        // First device to connect seeds an empty sheet with what it already has.
-        if (!docs.accounts && (this.docs.accounts || ls.get("decolabo.accounts", null))) await this.seed();
-        else { this.docs = docs; this.sales = j.sales || []; this.ready = true; this.save(); this.emitAll(); }
-      }
-    } catch (e) {
-      this.setOnline(false);
-      const ls_ = document.getElementById("loginState");
-      if (!this.ready && ls_) ls_.textContent = e && e.code === "bad_key" ? "共有先の合言葉が違います。接続リンクを確認してください。" : "スプレッドシートにつながりません。通信を確認してください(自動で再接続します)。";
-      if (e && e.code === "bad_key") { state.dbError = "共有先の合言葉が違います。管理画面で接続をやり直してください。"; render(); }
-    } finally { this.polling = false; this.schedule(); }
-  },
-  async seed() {
-    const now = Date.now();
-    for (const name of ["products", "discounts", "accounts"]) {
-      const d = this.docs[name] || ls.get("decolabo." + name, null);
-      if (d) await callSheet(this.cfg, { op: "setDoc", name, data: Object.assign({}, d, { updatedAt: now }) });
-    }
-    const local = ls.get("decolabo.sales", []);
-    if (local.length) await callSheet(this.cfg, { op: "putSales", sales: local });
-    this.rev = null; this.polling = false; return this.poll();
-  },
-  setOnline(v) { if (this.online !== v) { this.online = v; render(); } },
-  save() { ls.set("decolabo.sheetCache", { docs: this.docs, sales: this.sales }); },
-  emitAll() { ["products", "discounts", "accounts"].forEach(n => docCallbacks[n] && docCallbacks[n](this.docs[n] || null)); this.emitSales(); },
-  mergedSales() {
-    const by = new Map(this.sales.map(s => [s.id, s]));
-    this.outbox.forEach(s => by.set(s.id, s));
-    return [...by.values()].sort((a, b) => b.ts - a.ts);
-  },
-  emitSales() { this.salesCb && this.salesCb(this.mergedSales()); },
-  async flush() {
-    while (this.outbox.length) {
-      const s = this.outbox[0];
-      await callSheet(this.cfg, { op: "putSale", sale: s });
-      this.sales = this.sales.filter(x => x.id !== s.id).concat([s]);
-      this.outbox.shift(); ls.set("decolabo.outbox", this.outbox); this.save();
-      this.rev = null; // our own write moved the sheet forward; pull the full state again
-    }
-  }
-};
-
+/* ---------- storage: shared db when available, this device otherwise ---------- */
 const Store = {
-  mode: "loading", db: null,
+  mode: "loading", db: null, salesCol: "sales",
   async init() {
-    const fromHash = readConnectHash();
-    if (fromHash) { ls.set("decolabo.remote", fromHash); history.replaceState(null, "", location.pathname + location.search); }
+    if (FIREBASE_CONFIG) {
+      for (;;) {
+        try {
+          const m = await import("./firebase-db.bundle.js");
+          this.db = await m.createDb(FIREBASE_CONFIG, onDbError);
+          this.mode = "cloud"; this.salesCol = "posSales"; return;
+        } catch {
+          const el = document.getElementById("loginState");
+          if (el) el.textContent = "保存先につながりません。通信を確認してください(自動で再接続します)。";
+          await new Promise(r => setTimeout(r, 5000));
+        }
+      }
+    }
     let db = null;
     try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch { db = null; }
-    const remote = ls.get("decolabo.remote", null);
-    if (db) { this.db = db; this.mode = "cloud"; }
-    else if (remote && remote.url) { this.mode = "sheet"; Sheet.start(remote); }
-    else { this.mode = "local"; }
+    if (db) { this.db = db; this.mode = "cloud"; } else { this.mode = "local"; }
   },
   watchDoc(name, cb) {
-    // Without a cached copy, wait for the first sync so a new device never shows the "create admin" screen by mistake.
-    if (this.mode === "sheet") { if (Sheet.ready) cb(Sheet.docs[name] || null); return; }
     if (this.mode === "cloud") {
       return this.db.doc("pos/" + name).onSnapshot(s => cb(s.exists ? s.data() : null), e => onDbError(e));
     }
@@ -345,17 +271,12 @@ const Store = {
     addEventListener("storage", e => { if (e.key === key) cb(ls.get(key, null)); });
   },
   async setDoc(name, data) {
-    if (this.mode === "sheet") {
-      await callSheet(Sheet.cfg, { op: "setDoc", name, data });
-      Sheet.docs[name] = data; Sheet.rev = null; Sheet.save(); localEmit(name, data); return;
-    }
     if (this.mode === "cloud") return withRetry(() => this.db.doc("pos/" + name).set(data));
     ls.set("decolabo." + name, data); localEmit(name, data);
   },
   watchSales(cb) {
-    if (this.mode === "sheet") { Sheet.salesCb = cb; Sheet.emitSales(); return; }
     if (this.mode === "cloud") {
-      return this.db.collection("sales").orderBy("ts", "desc").limit(1000)
+      return this.db.collection(this.salesCol).orderBy("ts", "desc").limit(1000)
         .onSnapshot(s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data()))), e => onDbError(e));
     }
     const key = "decolabo.sales";
@@ -364,24 +285,13 @@ const Store = {
     addEventListener("storage", e => { if (e.key === key) emit(); });
   },
   async putSale(sale) {
-    if (this.mode === "sheet") {
-      // Queue first so a checkout never waits on (or fails with) the network.
-      Sheet.outbox = Sheet.outbox.filter(s => s.id !== sale.id).concat([sale]);
-      ls.set("decolabo.outbox", Sheet.outbox); Sheet.emitSales();
-      Sheet.poll(); return;
-    }
     const { id, ...body } = sale;
-    if (this.mode === "cloud") return withRetry(() => this.db.collection("sales").doc(id).set(body));
+    if (this.mode === "cloud") return withRetry(() => this.db.collection(this.salesCol).doc(id).set(body));
     const all = ls.get("decolabo.sales", []).filter(s => s.id !== id); all.push(sale);
     ls.set("decolabo.sales", all); localListeners.sales && localListeners.sales();
   },
   async deleteSale(id) {
-    if (this.mode === "sheet") {
-      await callSheet(Sheet.cfg, { op: "deleteSale", id });
-      Sheet.sales = Sheet.sales.filter(s => s.id !== id); Sheet.outbox = Sheet.outbox.filter(s => s.id !== id);
-      ls.set("decolabo.outbox", Sheet.outbox); Sheet.rev = null; Sheet.save(); Sheet.emitSales(); return;
-    }
-    if (this.mode === "cloud") return withRetry(() => this.db.collection("sales").doc(id).delete());
+    if (this.mode === "cloud") return withRetry(() => this.db.collection(this.salesCol).doc(id).delete());
     ls.set("decolabo.sales", ls.get("decolabo.sales", []).filter(s => s.id !== id));
     localListeners.sales && localListeners.sales();
   }
@@ -401,7 +311,6 @@ function errText(e) {
   if (c === "invalid_argument") return "保存できませんでした。このアカウントには書き込み権限がありません。";
   if (c === "quota_exceeded") return "保存容量の上限に達しました。古い売上を消去してください。";
   if (c === "unavailable") return "通信が不安定で保存できませんでした。もう一度押してください。";
-  if (c === "bad_key") return "共有先の合言葉が違います。管理画面で接続をやり直してください。";
   return "保存できませんでした(" + (c || "error") + ")。もう一度押してください。";
 }
 function onDbError(e) { state.dbError = errText(e); render(); }
@@ -463,34 +372,7 @@ function render() {
 function modeNote() {
   return Store.mode === "cloud"
     ? "データはこのページに保存され、ログインした全端末で共有されます。"
-    : Store.mode === "sheet" ? "データはGoogleスプレッドシートに保存され、接続した全端末で共有されます。"
     : "この端末のブラウザ内だけに保存されています(他の端末とは共有されません)。";
-}
-function viewModePill() {
-  if (Store.mode === "cloud") return `<span class="pill cloud">共有中</span>`;
-  if (Store.mode !== "sheet") return `<span class="pill local">この端末のみ</span>`;
-  const n = Sheet.outbox.length;
-  if (!Sheet.online) return `<span class="pill off">オフライン${n ? `・未送信${n}件` : ""}</span>`;
-  return `<span class="pill sheet">共有中${n ? `・送信待ち${n}件` : ""}</span>`;
-}
-function viewConnectForm() {
-  return `<form id="connectForm" class="connect" autocomplete="off">
-      <label class="f">接続URL(Apps ScriptのウェブアプリURL)<input id="cn-url" required placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" spellcheck="false"></label>
-      <label class="f">合言葉<input id="cn-key" required autocapitalize="off" spellcheck="false"></label>
-      <div class="err" id="cn-err"></div>
-      <button class="btn-primary" type="submit">接続する</button></form>`;
-}
-function viewShareAdmin() {
-  if (Store.mode === "cloud") return "";
-  if (Store.mode !== "sheet") return `<div class="card" style="margin-top:16px"><h2>全端末で共有</h2>
-    <p class="note">Googleスプレッドシートにつなぐと、商品・割引・アカウント・売上が全端末で共有されます。この端末のデータは、空のスプレッドシートにそのまま移されます。</p>
-    ${viewConnectForm()}</div>`;
-  const link = connectLink(Sheet.cfg);
-  return `<div class="card" style="margin-top:16px"><h2>全端末で共有</h2>
-    <p class="note">${Sheet.online ? "スプレッドシートに接続しています。" : "スプレッドシートにつながっていません。通信が戻ると自動で送ります。"}${Sheet.outbox.length ? `送信待ちの会計が${Sheet.outbox.length}件あります。` : ""}</p>
-    <label class="f">他の端末用の接続リンク<input id="cn-link" readonly value="${esc(link)}"></label>
-    <div class="filters"><button class="btn-primary" data-act="copyLink">リンクをコピー</button><button class="btn-ghost" data-act="disconnect">この端末の接続を解除</button></div>
-    <p class="note">このリンクを新しい端末で開くと、すぐに同じデータが使えます。リンクには合言葉が入っているので、スタッフ以外には送らないでください。</p></div>`;
 }
 
 function viewSetup() {
@@ -504,10 +386,6 @@ function viewSetup() {
       <div class="err" id="su-err"></div>
       <button class="btn-primary pay" type="submit">管理者アカウントを作成</button>
     </form>
-    <div class="handoff"><p class="note">共有用のスプレッドシートがある場合は、管理者から届いた接続リンクを開くか、ここで接続してください。</p>
-      ${viewConnectForm()}
-      <p class="note">引き継ぎファイルがある場合はこちらから読み込めます。</p>
-      <button data-act="importFile">引き継ぎファイルを読み込む</button></div>
     <p class="note">${esc(modeNote())}</p>
   </div></section>`;
 }
@@ -532,7 +410,7 @@ function viewShell() {
   return `<header><div class="hd wrap">
       <div class="logo">デコ<b>ラボ</b></div>
       <nav>${tabs.map(([k, l]) => `<button data-tab="${k}" ${state.tab === k ? 'aria-current="page"' : ""}>${l}</button>`).join("")}</nav>
-      <div class="who">${viewModePill()}
+      <div class="who"><span class="pill ${Store.mode}">${Store.mode === "cloud" ? "共有中" : "この端末のみ"}</span>
         <span>${esc(u.id)}${u.role === "admin" ? "(管理者)" : ""}</span>
         <button class="btn-ghost" data-act="sound" aria-pressed="${soundOn}" title="音のオン・オフ">${soundOn ? "音 ON" : "音 OFF"}</button>
         <button class="btn-ghost" data-act="logout">ログアウト</button></div>
@@ -721,7 +599,6 @@ function viewAdmin() {
     <p class="note">売り切れた商品は「販売中」を外すとレジから消えます。過去の売上には影響しません。</p></div>
 
   ${viewDiscAdmin()}
-  ${viewShareAdmin()}
   <div class="card" style="margin-top:16px"><h2>ログインアカウント</h2>
     <div class="tbl-wrap"><table><thead><tr><th>ID</th><th>権限</th><th></th></tr></thead><tbody>
       ${state.accounts.map(a => `<tr><td>${esc(a.id)}${a.id === me().id ? "(あなた)" : ""}</td><td>${a.role === "admin" ? "管理者" : "スタッフ"}</td>
@@ -734,11 +611,6 @@ function viewAdmin() {
       <button class="btn-primary" type="submit">追加・更新</button>
     </form>
     <p class="note">既にあるIDを入れるとパスワードと権限を上書きします。パスワード変更もここから行えます。</p></div>
-
-  <div class="card" style="margin-top:16px"><h2>別の端末への引き継ぎ</h2>
-    <p class="note">商品・割引・アカウント・売上を1つのファイルに書き出します。新しい端末では、最初の設定画面かこの画面で読み込んでください。</p>
-    <div class="filters"><button class="btn-primary" data-act="exportFile">引き継ぎファイルを書き出す</button><button data-act="importFile">引き継ぎファイルを読み込む</button></div>
-    <p class="note">読み込むと、商品・割引・アカウントはファイルの内容に置き換わります。売上は消えずに足し合わされるので、閉店後に各レジのファイルを1台に読み込めば全体の売上を集計できます。</p></div>
 
   <div class="card" style="margin-top:16px"><h2>売上データの消去</h2>
     <p class="note">本番前に練習で入れた会計をすべて消します。元に戻せません。</p>
@@ -763,14 +635,6 @@ document.addEventListener("submit", async e => {
       await saveAccounts([{ id, salt, hash: await hashPw(salt, pw), role: "admin" }]);
       state.session = { id }; ss.set("decolabo.session", state.session); render();
     } catch (x) { err.textContent = errText(x); }
-  }
-  if (f.id === "connectForm") {
-    const cfg = { url: $("#cn-url").value.trim(), key: $("#cn-key").value.trim() };
-    const err = $("#cn-err"); err.textContent = "確認中…";
-    if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(cfg.url)) { err.textContent = "Apps ScriptのウェブアプリURL(https://script.google.com/…/exec)を入れてください。"; return; }
-    try { await callSheet(cfg, { op: "sync" }); }
-    catch (x) { err.textContent = x && x.code === "bad_key" ? "合言葉が違います。" : "接続できませんでした。URLとウェブアプリの公開設定を確認してください。"; return; }
-    ls.set("decolabo.remote", cfg); location.reload(); return;
   }
   if (f.id === "loginForm") {
     const id = $("#li-id").value.trim(), pw = $("#li-pw").value;
@@ -891,17 +755,6 @@ document.addEventListener("click", async e => {
       render(); break;
     }
     case "csv": await exportCsv(); break;
-    case "exportFile": await exportHandoff(); break;
-    case "copyLink": {
-      const el = $("#cn-link");
-      try { await navigator.clipboard.writeText(el.value); toast("接続リンクをコピーしました"); }
-      catch { el.select(); toast("リンクを選択しました。コピーしてください"); }
-      break;
-    }
-    case "disconnect":
-      if (Sheet.outbox.length) { toast("送信待ちの会計があるため解除できません。通信が戻るまで待ってください。"); break; }
-      ls.set("decolabo.remote", null); ls.set("decolabo.sheetCache", null); location.reload(); break;
-    case "importFile": pickHandoff(); break;
   }
 });
 
@@ -936,56 +789,20 @@ async function exportCsv() {
     new Date(s.ts).toLocaleString("ja-JP"), s.no, i.name, i.price, i.qty, i.price * i.qty, s.discount ? s.discount.name : "", s.discount ? s.discount.amount : 0, s.total,
     s.received, s.change, s.staff, s.voided ? "取消" : ""])));
   const csv = "﻿" + rows.map(r => r.map(q).join(",")).join("\r\n");
-  await saveFile(`decolabo-sales-${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv");
-}
-
-async function saveFile(filename, data, type) {
   let dl = null;
   try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch {}
+  const filename = `decolabo-sales-${new Date().toISOString().slice(0, 10)}.csv`;
   if (!dl) {
-    // Outside claude.ai (e.g. GitHub Pages) fall back to a plain browser download.
     try {
-      const url = URL.createObjectURL(new Blob([data], { type }));
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
       const a = document.createElement("a");
       a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      return true;
-    } catch { toast("ファイルを保存できませんでした"); return false; }
+    } catch { toast("CSVを保存できませんでした"); }
+    return;
   }
-  try { await dl.save({ filename, data }); return true; }
-  catch (x) { if (!x || x.code !== "declined") toast("ファイルを保存できませんでした"); return false; }
-}
-
-/* ---------- hand-off file: move settings (and sales) to another device ---------- */
-async function exportHandoff() {
-  const file = { app: "decolabo-pos", version: 1, exportedAt: Date.now(),
-    products: state.products, discounts: state.discounts, accounts: state.accounts, sales: state.sales };
-  const d = new Date(), pad = n => String(n).padStart(2, "0");
-  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
-  if (await saveFile(`decolabo-handoff-${stamp}.json`, JSON.stringify(file), "application/json")) toast("引き継ぎファイルを書き出しました");
-}
-function pickHandoff() {
-  const inp = document.createElement("input");
-  inp.type = "file"; inp.accept = ".json,application/json";
-  inp.onchange = async () => { const f = inp.files && inp.files[0]; if (f) await importHandoff(await f.text()); };
-  inp.click();
-}
-async function importHandoff(text) {
-  let file;
-  try { file = JSON.parse(text); } catch { toast("引き継ぎファイルではありません"); return; }
-  if (!file || file.app !== "decolabo-pos" || !Array.isArray(file.accounts) || !file.accounts.length) { toast("引き継ぎファイルではありません"); return; }
-  try {
-    const now = Date.now();
-    await Store.setDoc("products", { items: file.products || [], updatedAt: now });
-    await Store.setDoc("discounts", { items: file.discounts || [], updatedAt: now });
-    await Store.setDoc("accounts", { items: file.accounts, updatedAt: now });
-    const have = new Set(state.sales.map(x => x.id));
-    const add = (file.sales || []).filter(x => x && x.id && !have.has(x.id));
-    for (const sale of add) await Store.putSale(sale);
-    state.draft = null; state.ddraft = null;
-    toast(`読み込みました(商品${(file.products || []).length}件・売上${add.length}件を追加)`);
-  } catch (x) { toast(errText(x)); }
-  render();
+  try { await dl.save({ filename, data: csv }); }
+  catch (x) { if (!x || x.code !== "declined") toast("CSVを保存できませんでした"); }
 }
 })();
 </script>
