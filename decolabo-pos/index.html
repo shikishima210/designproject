@@ -94,6 +94,14 @@ main{padding-block:16px 96px}
 }
 @media (hover:none){.prod .padd{opacity:.6}}
 .prod:active{transform:translateY(0)}
+/* Quantity pill on a product that is already in the order: − count ＋ */
+.pcell{position:relative;display:grid}
+.prod.in{padding-bottom:62px;border-color:var(--peri)}
+.qs{position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;justify-content:space-between;padding:4px;border-radius:999px;background:var(--fg);box-shadow:0 8px 16px -10px var(--fg)}
+.qs button{width:36px;height:36px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;min-height:0}
+.qs .m{background:var(--muted);color:#fff}
+.qs .p{background:#fff;color:var(--fg)}
+.qs span{flex:1;text-align:center;color:#fff;font-weight:700;font-size:18px}
 .cart{position:sticky;top:76px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px}
 .lines{display:grid;gap:8px;max-height:38vh;overflow:auto}
 .line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
@@ -188,6 +196,8 @@ const FIREBASE_CONFIG = { apiKey: "AIzaSyBTyZBRvU015YN518yqX5vldnJmPzdgEy4", aut
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const yen = n => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
+const ICON_MINUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const ICON_PLUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const mem = {}; // keeps data for this visit when browser storage is blocked
 const ls = {
@@ -335,6 +345,9 @@ const isAdmin = () => (me() || {}).role === "admin";
   await Store.init();
   const sub = (name) => {
     const cb = (data) => {
+      // An unedited admin draft follows the saved list, so it never shows (or saves back) an old copy.
+      const draftKey = { products: "draft", discounts: "ddraft" }[name];
+      if (draftKey && state[draftKey] && JSON.stringify(state[draftKey]) === JSON.stringify(state[name])) state[draftKey] = null;
       state[name] = (data && Array.isArray(data.items)) ? data.items : [];
       state.loaded[name] = true;
       render();
@@ -463,12 +476,15 @@ function viewRegister() {
   const lines = cartLines(), total = cartTotal();
   const rec = Number(state.received) || 0, change = rec - total;
   const canPay = lines.length && !state.busy && rec >= total;
-  const card = (p, color) => `<button class="prod num" data-add="${esc(p.id)}" title="クリックでお会計に追加">
+  const card = (p, color) => {
+    const q = state.cart[p.id] || 0;
+    return `<div class="pcell"><button class="prod num${q ? " in" : ""}" data-add="${esc(p.id)}" title="クリックでお会計に追加">
           <span class="sw" style="background:${color}"></span>
           <span class="pn${p.name.length > 10 ? " xlong" : p.name.length > 8 ? " long" : ""}" title="${esc(p.name)}">${esc(p.name)}</span>
           <span class="pp">${yen(p.price)}</span>
-          ${state.cart[p.id] ? `<span class="pq">×${state.cart[p.id]}</span>` : ""}
-          <span class="padd">＋ 追加</span></button>`;
+          ${q ? "" : `<span class="padd">＋ 追加</span>`}</button>
+        ${q ? `<div class="qs num"><button class="m" data-dec="${esc(p.id)}" aria-label="${esc(p.name)}を1つ減らす">${ICON_MINUS}</button><span aria-live="polite">${q}</span><button class="p" data-add="${esc(p.id)}" aria-label="${esc(p.name)}を1つ増やす">${ICON_PLUS}</button></div>` : ""}</div>`;
+  };
   const grid = prods.length
     ? `<div class="cats">${CATS.map(([name, color]) => {
         const list = prods.filter(p => catOf(p) === name);
@@ -729,7 +745,7 @@ document.addEventListener("click", async e => {
     case "resetDiscs": state.ddraft = null; render(); break;
     case "saveDiscs": {
       const items = state.ddraft.filter(d => String(d.name).trim()).map(d => ({ id: d.id, name: String(d.name).trim(), kind: d.kind === "pct" ? "pct" : "yen", value: Math.max(0, Math.min(d.kind === "pct" ? 100 : 1e7, Number(d.value) || 0)), active: d.active !== false }));
-      try { await Store.setDoc("discounts", { items, updatedAt: Date.now() }); state.ddraft = null; toast("割引を保存しました"); } catch (x) { toast(errText(x)); }
+      try { await Store.setDoc("discounts", { items, updatedAt: Date.now() }); state.discounts = items; state.ddraft = null; toast("割引を保存しました"); } catch (x) { toast(errText(x)); }
       render(); break;
     }
     case "toCart": $("#cart").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); break;
@@ -743,7 +759,7 @@ document.addEventListener("click", async e => {
     case "resetProds": state.draft = null; render(); break;
     case "saveProds": {
       const items = state.draft.filter(p => String(p.name).trim()).map(p => ({ id: p.id, name: String(p.name).trim(), price: Number(p.price) || 0, active: p.active !== false, cat: catOf(p) }));
-      try { await Store.setDoc("products", { items, updatedAt: Date.now() }); state.draft = null; toast("商品を保存しました"); } catch (x) { toast(errText(x)); }
+      try { await Store.setDoc("products", { items, updatedAt: Date.now() }); state.products = items; state.draft = null; toast("商品を保存しました"); } catch (x) { toast(errText(x)); }
       render(); break;
     }
     case "askWipe": state.confirmWipe = true; render(); break;
