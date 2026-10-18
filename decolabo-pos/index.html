@@ -335,6 +335,9 @@ const isAdmin = () => (me() || {}).role === "admin";
   await Store.init();
   const sub = (name) => {
     const cb = (data) => {
+      // An unedited admin draft follows the saved list, so it never shows (or saves back) an old copy.
+      const draftKey = { products: "draft", discounts: "ddraft" }[name];
+      if (draftKey && state[draftKey] && JSON.stringify(state[draftKey]) === JSON.stringify(state[name])) state[draftKey] = null;
       state[name] = (data && Array.isArray(data.items)) ? data.items : [];
       state.loaded[name] = true;
       render();
@@ -729,7 +732,7 @@ document.addEventListener("click", async e => {
     case "resetDiscs": state.ddraft = null; render(); break;
     case "saveDiscs": {
       const items = state.ddraft.filter(d => String(d.name).trim()).map(d => ({ id: d.id, name: String(d.name).trim(), kind: d.kind === "pct" ? "pct" : "yen", value: Math.max(0, Math.min(d.kind === "pct" ? 100 : 1e7, Number(d.value) || 0)), active: d.active !== false }));
-      try { await Store.setDoc("discounts", { items, updatedAt: Date.now() }); state.ddraft = null; toast("割引を保存しました"); } catch (x) { toast(errText(x)); }
+      try { await Store.setDoc("discounts", { items, updatedAt: Date.now() }); state.discounts = items; state.ddraft = null; toast("割引を保存しました"); } catch (x) { toast(errText(x)); }
       render(); break;
     }
     case "toCart": $("#cart").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); break;
@@ -743,7 +746,7 @@ document.addEventListener("click", async e => {
     case "resetProds": state.draft = null; render(); break;
     case "saveProds": {
       const items = state.draft.filter(p => String(p.name).trim()).map(p => ({ id: p.id, name: String(p.name).trim(), price: Number(p.price) || 0, active: p.active !== false, cat: catOf(p) }));
-      try { await Store.setDoc("products", { items, updatedAt: Date.now() }); state.draft = null; toast("商品を保存しました"); } catch (x) { toast(errText(x)); }
+      try { await Store.setDoc("products", { items, updatedAt: Date.now() }); state.products = items; state.draft = null; toast("商品を保存しました"); } catch (x) { toast(errText(x)); }
       render(); break;
     }
     case "askWipe": state.confirmWipe = true; render(); break;
