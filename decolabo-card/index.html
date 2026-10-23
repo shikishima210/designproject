@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>推しカードメーカー｜デコラボ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@700;900&display=block" rel="stylesheet">
+<style>
+:root{--ink:#1B1F3B;--sub:#6B6F8E;--line:#E2E4F0;--bg:#F4F5FB;--accent:#0066E6}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Zen Maru Gothic",sans-serif;font-weight:700}
+header{padding:20px 16px 8px;max-width:1100px;margin:0 auto}
+header h1{margin:0;font-size:22px;font-weight:900}
+header p{margin:4px 0 0;color:var(--sub);font-size:13px}
+main{max-width:1100px;margin:0 auto;padding:8px 16px 40px;display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px}
+@media (max-width:760px){main{grid-template-columns:minmax(0,1fr)}}
+.stage{position:sticky;top:12px;align-self:start;text-align:center}
+@media (max-width:760px){.stage{position:static}}
+.stage svg{width:100%;max-width:300px;height:auto;filter:drop-shadow(0 6px 16px rgba(27,31,59,.18))}
+.stage .slot-label{color:var(--sub);font-size:13px;margin-top:6px}
+.panel{background:#fff;border-radius:14px;padding:16px;border:1px solid var(--line)}
+.panel+.panel{margin-top:16px}
+.panel h2{font-size:15px;margin:0 0 10px;font-weight:900}
+.row{margin-bottom:14px}
+.row:last-child{margin-bottom:0}
+.row>label,.lab{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
+.sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
+input[type=color]{width:38px;height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:2px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+input[type=text]{width:100%;font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;color:var(--ink)}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.phrases{margin-top:6px}
+.phrases .chip{font-size:12px;padding:4px 10px}
+.check{display:flex;align-items:center;gap:6px;font-size:13px}
+.photo-row{display:none}
+.photo-row.on{display:block}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:inherit;font-size:14px;border-radius:10px;padding:10px 14px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:hover{filter:brightness(.97)}
+.sheet{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:420px}
+.sheet button{border:0;padding:0;background:none;cursor:pointer;border-radius:4px;outline:2px solid transparent;outline-offset:3px}
+.sheet button[aria-current=true]{outline-color:var(--accent)}
+.sheet svg{display:block;width:100%;height:auto;box-shadow:0 2px 8px rgba(27,31,59,.15)}
+.hint{font-size:12px;color:var(--sub);margin:8px 0 0;line-height:1.6}
+#print-sheet{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  body{background:#fff}
+  header,main{display:none!important}
+  #print-sheet{display:block;position:relative;width:210mm;height:297mm;overflow:hidden}
+  #print-sheet svg{display:block}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>推しカードメーカー</h1>
+  <p>チェキサイズ（54×86mm）の推しカードを作って、A4に9枚並べて印刷できます。</p>
+</header>
+<main>
+  <section class="stage">
+    <div id="big"></div>
+    <div class="slot-label" id="slotLabel"></div>
+  </section>
+  <section>
+    <div class="panel">
+      <h2>カードの中身</h2>
+      <div class="row">
+        <span class="lab">推し色</span>
+        <div class="swatches" id="colors"></div>
+      </div>
+      <div class="row">
+        <span class="lab">キャラ・写真</span>
+        <div class="chips" id="chars"></div>
+      </div>
+      <div class="row photo-row" id="photoRow">
+        <label for="photo">写真をえらぶ（写真はこの端末の中だけで使い、どこにも送られません）</label>
+        <input type="file" id="photo" accept="image/*">
+        <div class="chips" id="photoPos" style="margin-top:8px"></div>
+      </div>
+      <div class="row">
+        <label for="title">上の文字</label>
+        <input type="text" id="title" maxlength="14">
+      </div>
+      <div class="row">
+        <label for="msg">下のひとこと</label>
+        <input type="text" id="msg" maxlength="16">
+        <div class="chips phrases" id="phrases"></div>
+      </div>
+      <div class="row">
+        <label for="foot">いちばん下の小さい文字</label>
+        <input type="text" id="foot" maxlength="30">
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="showNo"> 右下に番号（No.01）を入れる</label>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>印刷シート（A4・9枚）</h2>
+      <div class="sheet" id="sheet"></div>
+      <p class="hint">カードを押すと、そのカードを編集できます。</p>
+      <div class="btns" style="margin-top:12px">
+        <button class="btn" id="copyAll">このデザインを9枚ぜんぶに</button>
+        <button class="btn" id="rainbow">9色セットにする</button>
+        <button class="btn primary" id="print">印刷する</button>
+      </div>
+      <p class="hint">印刷は「実寸（100%）」「余白なし」を選び、トンボ（四隅の目印）に合わせて切ってください。写真用紙か厚手のマット紙がおすすめです。</p>
+    </div>
+  </section>
+</main>
+<div id="print-sheet"></div>
+
+<script>
+const W = 54, H = 86, PX = 4, PY = 6.5, PW = 46, PH = 62;
+const COLORS = ['#E8494F','#F28C38','#F2C230','#5DBB6A','#35BCC6','#4A8FE7','#8A6CE0','#F06BA8','#3B4A9C'];
+const CHARS = [['cat','ねこ'],['bear','くま'],['rabbit','うさぎ'],['dog','いぬ'],['mouse','ねずみ'],['photo','写真']];
+const FUR = {cat:'#FFF6EE',bear:'#F3DCC4',rabbit:'#FFFFFF',dog:'#FFF3E2',mouse:'#F4F1F8'};
+const PHRASES = ['今日も推しが尊い','推しは世界を救う','生きててえらい！','推しのおかげで元気','だいすきが止まらない','推しに会える日まで','推し色で生きてく','尊さで今日も無理','ずっと応援してるよ'];
+const ANIMALS = ['cat','bear','rabbit','dog','mouse','cat','rabbit','bear','dog'];
+const STORE = 'decolabo-card-v1';
+
+const preset = i => ({color:COLORS[i], ch:ANIMALS[i], title:'Oshi Love', msg:PHRASES[i], foot:'deco labo · 2026.10.25', showNo:true, photo:null, pos:'Mid'});
+let cards = Array.from({length:9}, (_, i) => preset(i));
+let sel = 0;
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+  if (Array.isArray(saved) && saved.length === 9) cards = saved.map((c, i) => ({...preset(i), ...c}));
+} catch (e) {}
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify(cards)); }
+  catch (e) { try { localStorage.setItem(STORE, JSON.stringify(cards.map(c => ({...c, photo:null})))); } catch (e2) {} }
+}
+
+// 色計算
+function hexToHsl(hex) {
+  const n = parseInt(hex.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  let h = 0, s = 0;
+  if (d) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return [h, s * 100, l * 100];
+}
+const hsl = (h, s, l) => `hsl(${h.toFixed(0)} ${Math.min(100, s).toFixed(0)}% ${Math.max(0, Math.min(100, l)).toFixed(0)}%)`;
+function palette(hex) {
+  const [h, s, l] = hexToHsl(hex);
+  return {base:hex, dark:hsl(h, s * 0.85, Math.min(l * 0.62, 40)), light:hsl(h, Math.max(s, 60), 91)};
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+function rng(seed) { let s = seed * 9301 + 49297; return () => ((s = (s * 9301 + 49297) % 233280) / 233280); }
+const heart = (x, y, s, fill, op = 1, rot = 0) =>
+  `<path transform="translate(${x} ${y}) rotate(${rot}) scale(${s})" d="M0 0.35 C -0.9 -0.25 -0.45 -0.95 0 -0.45 C 0.45 -0.95 0.9 -0.25 0 0.35 Z" fill="${fill}" opacity="${op}"/>`;
+const sparkle = (x, y, s, op) =>
+  `<path transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${s.toFixed(2)})" d="M0 -1 Q0.13 -0.13 1 0 Q0.13 0.13 0 1 Q-0.13 0.13 -1 0 Q-0.13 -0.13 0 -1Z" fill="#fff" opacity="${op.toFixed(2)}"/>`;
+
+function ears(ch, fur, dark) {
+  const inner = '#FFB3C4', st = `stroke="${dark}" stroke-width="0.3"`;
+  switch (ch) {
+    case 'cat': return `<path d="M16.6 40 L16.2 29.5 L24.5 35 Z" fill="${fur}" ${st} stroke-linejoin="round"/><path d="M37.4 40 L37.8 29.5 L29.5 35 Z" fill="${fur}" ${st} stroke-linejoin="round"/><path d="M18 37.5 L17.8 32 L22.3 35 Z" fill="${inner}"/><path d="M36 37.5 L36.2 32 L31.7 35 Z" fill="${inner}"/>`;
+    case 'rabbit': return `<ellipse cx="21.5" cy="28" rx="3.1" ry="8.2" transform="rotate(-12 21.5 28)" fill="${fur}" ${st}/><ellipse cx="32.5" cy="28" rx="3.1" ry="8.2" transform="rotate(12 32.5 28)" fill="${fur}" ${st}/><ellipse cx="21.5" cy="28.5" rx="1.5" ry="6" transform="rotate(-12 21.5 28)" fill="${inner}"/><ellipse cx="32.5" cy="28.5" rx="1.5" ry="6" transform="rotate(12 32.5 28)" fill="${inner}"/>`;
+    case 'bear': return `<circle cx="17.6" cy="35.2" r="4.1" fill="${fur}" ${st}/><circle cx="36.4" cy="35.2" r="4.1" fill="${fur}" ${st}/><circle cx="17.8" cy="35.4" r="2.1" fill="#E7B99A"/><circle cx="36.2" cy="35.4" r="2.1" fill="#E7B99A"/>`;
+    case 'mouse': return `<circle cx="16" cy="34" r="5.6" fill="${fur}" ${st}/><circle cx="38" cy="34" r="5.6" fill="${fur}" ${st}/><circle cx="16.3" cy="34.3" r="3.3" fill="${inner}"/><circle cx="37.7" cy="34.3" r="3.3" fill="${inner}"/>`;
+    default: return '';
+  }
+}
+function character(c, p, id) {
+  const fur = FUR[c.ch], ink = '#2B2350', st = `stroke="${p.dark}" stroke-width="0.3"`;
+  const dogEars = c.ch === 'dog' ? `<ellipse cx="15.6" cy="42" rx="3.3" ry="6.8" transform="rotate(18 15.6 42)" fill="#D9A879" ${st}/><ellipse cx="38.4" cy="42" rx="3.3" ry="6.8" transform="rotate(-18 38.4 42)" fill="#D9A879" ${st}/>` : '';
+  return `
+    <line x1="41.6" y1="44.2" x2="45.2" y2="34" stroke="${p.light}" stroke-width="4.2" stroke-linecap="round" filter="url(#${id}glow)" opacity="0.95"/>
+    <line x1="41.6" y1="44.2" x2="45.2" y2="34" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>
+    <line x1="41.6" y1="44.2" x2="45.2" y2="34" stroke="${p.light}" stroke-width="1.1" stroke-linecap="round"/>
+    <line x1="39.6" y1="50" x2="41.6" y2="44.4" stroke="#4A4560" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M16.5 70 C16.5 60 19.5 54 27 54 C34.5 54 37.5 60 37.5 70 Z" fill="${p.dark}" stroke="${p.dark}" stroke-width="0.3"/>
+    <path d="M23.5 54.4 L27 58 L30.5 54.4" fill="none" stroke="#fff" stroke-width="0.6" stroke-linejoin="round" opacity="0.9"/>
+    ${heart(27, 62.3, 4.2, '#fff')}${heart(27, 62.3, 2.6, p.base)}
+    <ellipse cx="18.6" cy="61.5" rx="2.4" ry="3.1" fill="${fur}" ${st}/>
+    ${ears(c.ch, fur, p.dark)}
+    <ellipse cx="27" cy="44" rx="13" ry="11" fill="${fur}" ${st}/>
+    ${dogEars}
+    <ellipse cx="22.5" cy="45" rx="1.9" ry="2.45" fill="${ink}"/><ellipse cx="31.5" cy="45" rx="1.9" ry="2.45" fill="${ink}"/>
+    <circle cx="23.1" cy="44" r="0.8" fill="#fff"/><circle cx="21.9" cy="46" r="0.38" fill="#fff"/>
+    <circle cx="32.1" cy="44" r="0.8" fill="#fff"/><circle cx="30.9" cy="46" r="0.38" fill="#fff"/>
+    <ellipse cx="19.4" cy="48.6" rx="2" ry="1.1" fill="#FF8FA3" opacity="0.6" filter="url(#${id}soft)"/>
+    <ellipse cx="34.6" cy="48.6" rx="2" ry="1.1" fill="#FF8FA3" opacity="0.6" filter="url(#${id}soft)"/>
+    <path d="M25.6 48 q0.7 1.1 1.4 0 q0.7 1.1 1.4 0" fill="none" stroke="${ink}" stroke-width="0.38" stroke-linecap="round"/>
+    <ellipse cx="39.2" cy="50.6" rx="2.2" ry="2.9" transform="rotate(-30 39.2 50.6)" fill="${fur}" ${st}/>`;
+}
+
+let uid = 0;
+function cardSvg(c, no, attrs = '') {
+  const id = 'k' + (uid++), p = palette(c.color), r = rng(no * 7 + 3);
+  const isPhoto = c.ch === 'photo';
+  let bokeh = '';
+  for (let i = 0; i < 14; i++) {
+    const x = PX + r() * PW, y = PY + r() * PH, rr = 1.2 + r() * 4.5, op = 0.08 + r() * 0.16;
+    if (!isPhoto) bokeh += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${rr.toFixed(2)}" fill="#fff" opacity="${op.toFixed(2)}"/>`;
+  }
+  let sp = '';
+  [[9, 30], [45, 27], [8.5, 50], [46, 58], [12, 64], [42, 66], [46.5, 9.5], [7.5, 9.5]].forEach(([x, y]) => {
+    sp += sparkle(x + (r() - .5) * 2, y + (r() - .5) * 2, 0.9 + r() * 1.1, 0.75 + r() * 0.25);
+  });
+  const msg = c.msg || '';
+  const mfs = Math.min(3.5, 38 / Math.max(1, msg.length + 2));
+  let inner;
+  if (isPhoto) {
+    inner = c.photo
+      ? `<image href="${c.photo}" x="${PX}" y="${PY}" width="${PW}" height="${PH}" preserveAspectRatio="xMid${'Y' + c.pos} slice"/>
+         <rect x="${PX}" y="${PY}" width="${PW}" height="20" fill="url(#${id}top)"/>`
+      : `<rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" fill="url(#${id}bg)"/>
+         <text x="27" y="46" text-anchor="middle" font-family="Zen Maru Gothic" font-weight="900" font-size="3" fill="#fff">写真をえらんでね</text>`;
+    inner += sp;
+  } else {
+    inner = `<rect x="${PX}" y="${PY}" width="${PW}" height="${PH}" fill="url(#${id}bg)"/>${bokeh}
+      <circle cx="27" cy="45" r="19" fill="#fff" opacity="0.18"/><circle cx="27" cy="45" r="15.5" fill="#fff" opacity="0.14"/>
+      ${sp}${heart(10.5, 40, 2.6, '#fff', 0.85, -15)}${heart(44, 45.5, 2.0, '#fff', 0.75, 12)}${heart(13.5, 57, 1.6, p.light, 0.9, -8)}
+      ${character(c, p, id)}`;
+  }
+  const title = c.title || '';
+  const tfs = Math.min(6.6, 70 / Math.max(1, title.length));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" ${attrs}>
+  <defs>
+    <radialGradient id="${id}bg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="${p.light}"/><stop offset="0.55" stop-color="${p.base}"/><stop offset="1" stop-color="${p.dark}"/></radialGradient>
+    <linearGradient id="${id}top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.dark}" stop-opacity="0.55"/><stop offset="1" stop-color="${p.dark}" stop-opacity="0"/></linearGradient>
+    <clipPath id="${id}clip"><rect x="${PX}" y="${PY}" width="${PW}" height="${PH}"/></clipPath>
+    <filter id="${id}glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="1.1"/></filter>
+    <filter id="${id}soft" x="-0.2" y="-0.2" width="1.4" height="1.4"><feGaussianBlur stdDeviation="0.35"/></filter>
+  </defs>
+  <rect width="${W}" height="${H}" fill="#fff"/>
+  <g clip-path="url(#${id}clip)">
+    ${inner}
+    <text x="27" y="13.2" text-anchor="middle" font-family="Zen Maru Gothic" font-weight="900" font-size="2.1" letter-spacing="0.45" fill="#fff">★ MY BEST ★</text>
+    <text x="27.3" y="22.3" text-anchor="middle" font-family="Pacifico, Zen Maru Gothic" font-size="${tfs.toFixed(2)}" fill="${p.dark}" opacity="0.45">${esc(title)}</text>
+    <text x="27" y="22" text-anchor="middle" font-family="Pacifico, Zen Maru Gothic" font-size="${tfs.toFixed(2)}" fill="#fff">${esc(title)}</text>
+  </g>
+  ${c.showNo ? `<text x="${W - 4.2}" y="72.3" text-anchor="end" font-family="Zen Maru Gothic" font-weight="700" font-size="1.7" letter-spacing="0.2" fill="#B9B4C8">No.${String(no).padStart(2, '0')}</text>` : ''}
+  ${msg ? `<text x="27" y="78.2" text-anchor="middle" font-family="Yusei Magic" font-size="${mfs.toFixed(2)}" fill="${p.dark}"><tspan fill="${p.base}">♥</tspan> ${esc(msg)} <tspan fill="${p.base}">♥</tspan></text>` : ''}
+  <text x="27" y="83" text-anchor="middle" font-family="Pacifico, Zen Maru Gothic" font-size="2.2" fill="#A39DB8">${esc(c.foot || '')}</text>
+</svg>`;
+}
+
+// 画面
+const $ = id => document.getElementById(id);
+function chipGroup(el, items, cur, onPick) {
+  el.innerHTML = items.map(([v, t]) => `<button class="chip" data-v="${esc(v)}" aria-pressed="${v === cur}">${esc(t)}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('button'); if (b) onPick(b.dataset.v); };
+}
+function renderControls() {
+  const c = cards[sel];
+  $('colors').innerHTML = COLORS.map(col => `<button class="sw" style="background:${col}" data-c="${col}" aria-label="${col}" aria-pressed="${col.toLowerCase() === c.color.toLowerCase()}"></button>`).join('')
+    + `<input type="color" id="custom" value="${c.color}" title="好きな色">`;
+  $('colors').onclick = e => { const b = e.target.closest('.sw'); if (b) update({color:b.dataset.c}); };
+  $('custom').oninput = e => update({color:e.target.value}, false);
+  chipGroup($('chars'), CHARS, c.ch, v => update({ch:v}));
+  chipGroup($('photoPos'), [['Min','上に合わせる'],['Mid','まんなか'],['Max','下に合わせる']], c.pos, v => update({pos:v}));
+  $('photoRow').classList.toggle('on', c.ch === 'photo');
+  chipGroup($('phrases'), PHRASES.map(t => [t, t]), c.msg, v => update({msg:v}));
+  for (const k of ['title', 'msg', 'foot']) if (document.activeElement !== $(k)) $(k).value = c[k];
+  $('showNo').checked = c.showNo;
+  $('slotLabel').textContent = `${sel + 1}枚目を編集中`;
+}
+function renderCards() {
+  $('big').innerHTML = cardSvg(cards[sel], sel + 1);
+  $('sheet').innerHTML = cards.map((c, i) => `<button data-i="${i}" aria-current="${i === sel}" aria-label="${i + 1}枚目">${cardSvg(c, i + 1)}</button>`).join('');
+}
+function update(patch, controls = true) {
+  Object.assign(cards[sel], patch);
+  save(); renderCards();
+  if (controls) renderControls();
+}
+$('sheet').onclick = e => { const b = e.target.closest('button'); if (b) { sel = +b.dataset.i; renderCards(); renderControls(); } };
+for (const k of ['title', 'msg', 'foot']) $(k).oninput = e => update({[k]:e.target.value}, k === 'msg');
+$('showNo').onchange = e => update({showNo:e.target.checked});
+$('photo').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    // 印刷に十分な解像度(約350dpi)に縮小してから保持
+    const s = Math.min(1, 640 / Math.min(img.width, img.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    URL.revokeObjectURL(img.src);
+    update({photo:cv.toDataURL('image/jpeg', 0.9)});
+  };
+  img.src = URL.createObjectURL(f);
+  e.target.value = '';
+};
+$('copyAll').onclick = () => {
+  const c = cards[sel];
+  cards = cards.map(() => ({...c}));
+  save(); renderCards(); renderControls();
+};
+$('rainbow').onclick = () => {
+  const c = cards[sel];
+  cards = cards.map((_, i) => ({...c, color:COLORS[i], ch:c.ch === 'photo' ? c.ch : ANIMALS[i], msg:PHRASES[i]}));
+  save(); renderCards(); renderControls();
+};
+
+// 印刷: A4 に 3x3、カード間 8mm、四隅に L 字トンボ
+const G = 8;
+function buildPrint() {
+  const bw = 3 * W + 2 * G, bh = 3 * H + 2 * G, ox = (210 - bw) / 2, oy = (297 - bh) / 2;
+  let marks = '', placed = '';
+  cards.forEach((c, i) => {
+    const x = ox + (i % 3) * (W + G), y = oy + Math.floor(i / 3) * (H + G);
+    placed += `<div style="position:absolute;left:${x}mm;top:${y}mm">${cardSvg(c, i + 1, `width="${W}mm" height="${H}mm"`)}</div>`;
+    for (const [cx, sx] of [[x, -1], [x + W, 1]]) for (const [cy, sy] of [[y, -1], [y + H, 1]]) {
+      marks += `<line x1="${cx}" y1="${cy + sy}" x2="${cx}" y2="${cy + sy * 3.5}"/><line x1="${cx + sx}" y1="${cy}" x2="${cx + sx * 3.5}" y2="${cy}"/>`;
+    }
+  });
+  $('print-sheet').innerHTML = `<svg style="position:absolute;left:0;top:0" width="210mm" height="297mm" viewBox="0 0 210 297"><g stroke="#000" stroke-width="0.15">${marks}</g></svg>${placed}`;
+}
+$('print').onclick = async () => { buildPrint(); await document.fonts.ready; window.print(); };
+window.addEventListener('beforeprint', buildPrint);
+
+renderCards(); renderControls();
+document.fonts.ready.then(renderCards);
+</script>
+</body>
+</html>
