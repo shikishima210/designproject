@@ -9,6 +9,11 @@ service cloud.firestore {
     match /posSales/{id} {
       allow read, write: if request.auth != null;
     }
+    // 商品写真(1商品1件、縮小したJPEG)
+    match /posImages/{id} {
+      allow read, delete: if request.auth != null;
+      allow create, update: if request.auth != null && request.resource.data.data is string && request.resource.data.data.size() < 400000;
+    }
     // それ以外は全部拒否
     match /{document=**} {
       allow read, write: if false;

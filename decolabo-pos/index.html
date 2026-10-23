@@ -82,6 +82,16 @@ main{padding-block:16px 96px}
 .plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .prod{position:relative;display:grid;grid-template-rows:auto 1fr auto;gap:8px;min-height:140px;padding:0 0 14px;text-align:left;border-radius:14px;background:var(--surface);border:1px solid var(--line);overflow:hidden;transition:transform .12s,border-color .12s,box-shadow .12s}
 .prod .sw{height:14px}
+/* Product photo (or a tinted tile with the first letter when there is none) */
+.prod .ph{display:block;aspect-ratio:4/3;background:var(--cc,var(--lav));border-bottom:4px solid var(--cc,var(--lav));overflow:hidden;position:relative}
+.prod .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.prod .ph.none{display:grid;place-items:center;background:linear-gradient(135deg,var(--sunk),var(--mint));color:var(--muted);font-family:var(--display);font-size:34px}
+.pimg{width:52px;height:52px;border-radius:10px;border:1px dashed var(--peri);background:var(--sunk) center/cover no-repeat;display:grid;place-items:center;font-size:11px;color:var(--muted);cursor:pointer;position:relative;overflow:hidden}
+.pimg.has{border-style:solid;border-color:var(--line)}
+.pimg input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.pimg:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.pimgw{position:relative;width:52px;height:52px}
+.pimgx{position:absolute;top:-7px;right:-7px;width:22px;height:22px;padding:0;border-radius:50%;border:0;background:var(--fg);color:#fff;font-size:13px;line-height:22px;min-height:0}
 .prod .pn{padding:0 14px;font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .prod .pn.long{font-size:14px}
 .prod .pn.xlong{font-size:12.5px}
@@ -145,7 +155,7 @@ tr.void td.keep{text-decoration:none}
 .filters{display:flex;gap:6px}
 
 /* admin */
-.prow{display:grid;grid-template-columns:minmax(0,1fr) 140px 110px auto auto;gap:8px;align-items:center}
+.prow{display:grid;grid-template-columns:52px minmax(0,1fr) 140px 110px auto auto;gap:8px;align-items:center}
 .list{display:grid;gap:8px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:12px}
 .addacc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end}
@@ -167,7 +177,7 @@ tr.void td.keep{text-decoration:none}
   .mbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);justify-content:space-between;align-items:center;gap:12px;padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
   .mbar .v{font-size:22px;font-weight:700}
   .addacc{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .prow{grid-template-columns:minmax(0,1fr) 120px 90px;}
+  .prow{grid-template-columns:52px minmax(0,1fr) 110px;}
   .drow{grid-template-columns:minmax(0,1fr) 100px 80px}
 }
 
@@ -198,6 +208,22 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const yen = n => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
 const ICON_MINUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const ICON_PLUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+// Crops the picked photo to the card's 4:3 frame and shrinks it to a small JPEG (about 30–60KB).
+function photoToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const W = 480, H = 360, r = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+      const w = img.naturalWidth * r, h = img.naturalHeight * r;
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
+      g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+      URL.revokeObjectURL(url); resolve(c.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
+    img.src = url;
+  });
+}
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const mem = {}; // keeps data for this visit when browser storage is blocked
 const ls = {
@@ -284,6 +310,27 @@ const Store = {
     if (this.mode === "cloud") return withRetry(() => this.db.doc("pos/" + name).set(data));
     ls.set("decolabo." + name, data); localEmit(name, data);
   },
+  // Photos live one per document (posImages/<productId>) so the product list itself stays small.
+  watchImages(cb) {
+    if (this.mode === "cloud") {
+      return this.db.collection("posImages").onSnapshot(s => {
+        const m = {}; s.docs.forEach(d => { const v = d.data(); if (v && v.data) m[d.id] = v.data; }); cb(m);
+      }, e => onDbError(e));
+    }
+    const key = "decolabo.images";
+    const emit = () => cb(ls.get(key, {}));
+    localListeners.images = emit; emit();
+    addEventListener("storage", e => { if (e.key === key) emit(); });
+  },
+  async setImage(id, data) {
+    if (this.mode === "cloud") {
+      const ref = this.db.collection("posImages").doc(id);
+      return withRetry(() => data ? ref.set({ data, ts: Date.now() }) : ref.delete());
+    }
+    const all = Object.assign({}, ls.get("decolabo.images", {}));
+    if (data) all[id] = data; else delete all[id];
+    ls.set("decolabo.images", all); localListeners.images && localListeners.images();
+  },
   watchSales(cb) {
     if (this.mode === "cloud") {
       return this.db.collection(this.salesCol).orderBy("ts", "desc").limit(1000)
@@ -328,7 +375,7 @@ function onDbError(e) { state.dbError = errText(e); render(); }
 /* ---------- state ---------- */
 const state = {
   loaded: { products: false, accounts: false, discounts: false },
-  products: [], accounts: [], discounts: [], sales: [],
+  products: [], accounts: [], discounts: [], sales: [], images: {},
   discountId: null, manualDisc: "", manualOpen: false, ddraft: null,
   session: ss.get("decolabo.session"),
   tab: ls.get("decolabo.tab", "register"),
@@ -357,6 +404,7 @@ const isAdmin = () => (me() || {}).role === "admin";
   };
   sub("accounts"); sub("products"); sub("discounts");
   Store.watchSales(list => { state.sales = list; render(); });
+  Store.watchImages(m => { state.images = m; render(); });
 })();
 
 /* ---------- render ---------- */
@@ -478,8 +526,8 @@ function viewRegister() {
   const canPay = lines.length && !state.busy && rec >= total;
   const card = (p, color) => {
     const q = state.cart[p.id] || 0;
-    return `<div class="pcell"><button class="prod num${q ? " in" : ""}" data-add="${esc(p.id)}" title="クリックでお会計に追加">
-          <span class="sw" style="background:${color}"></span>
+    return `<div class="pcell" style="--cc:${color}"><button class="prod num${q ? " in" : ""}" data-add="${esc(p.id)}" title="クリックでお会計に追加">
+          ${state.images[p.id] ? `<span class="ph"><img src="${esc(state.images[p.id])}" alt=""></span>` : `<span class="ph none" aria-hidden="true">${esc(Array.from(p.name.trim())[0] || "")}</span>`}
           <span class="pn${p.name.length > 10 ? " xlong" : p.name.length > 8 ? " long" : ""}" title="${esc(p.name)}">${esc(p.name)}</span>
           <span class="pp">${yen(p.price)}</span>
           ${q ? "" : `<span class="padd">＋ 追加</span>`}</button>
@@ -604,6 +652,8 @@ function viewAdmin() {
   return `<div class="card"><div class="sec-h"><h2>商品と価格</h2>
       <div class="filters">${!d.length ? `<button data-act="sample">サンプル商品を入れる</button>` : ""}<button data-act="addProd">＋ 商品を追加</button></div></div>
     <div class="list">${d.length ? d.map((p, i) => `<div class="prow">
+        <div class="pimgw"><label class="pimg${state.images[p.id] ? " has" : ""}" ${state.images[p.id] ? `style="background-image:url('${esc(state.images[p.id])}')"` : ""} title="写真を選ぶ">${state.images[p.id] ? "" : "写真"}<input type="file" accept="image/*" data-pimg="${esc(p.id)}" aria-label="${esc(p.name || "商品")}の写真を選ぶ"></label>
+          ${state.images[p.id] ? `<button class="pimgx" data-delimg="${esc(p.id)}" aria-label="${esc(p.name)}の写真を外す" title="写真を外す">×</button>` : ""}</div>
         <input id="pn-${i}" data-pfield="name" data-i="${i}" value="${esc(p.name)}" placeholder="商品名" aria-label="商品名">
         <select id="pc-${i}" data-pfield="cat" data-i="${i}" aria-label="区分">${CATS.map(([c]) => `<option ${catOf(p) === c ? "selected" : ""}>${c}</option>`).join("")}</select>
         <input id="pp-${i}" class="num" data-pfield="price" data-i="${i}" value="${esc(p.price)}" inputmode="numeric" placeholder="価格" aria-label="価格(円)">
@@ -612,7 +662,7 @@ function viewAdmin() {
       : `<p class="note">商品がありません。「＋ 商品を追加」から登録してください。</p>`}</div>
     <div class="filters"><button class="btn-primary" id="saveProds" data-act="saveProds" ${dirty ? "" : "disabled"}>商品を保存</button>
       <button class="btn-ghost" id="resetProds" data-act="resetProds" ${dirty ? "" : "hidden"}>変更を破棄</button><span class="note" id="savedNote" ${dirty ? "hidden" : ""}>保存済み</span></div>
-    <p class="note">売り切れた商品は「販売中」を外すとレジから消えます。過去の売上には影響しません。</p></div>
+    <p class="note">売り切れた商品は「販売中」を外すとレジから消えます。過去の売上には影響しません。写真は選んだ時点で保存され、全端末のレジに表示されます。</p></div>
 
   ${viewDiscAdmin()}
   <div class="card" style="margin-top:16px"><h2>ログインアカウント</h2>
@@ -694,8 +744,17 @@ document.addEventListener("input", e => {
     $("#saveProds").disabled = !dirty; $("#resetProds").hidden = !dirty; $("#savedNote").hidden = dirty;
   }
 });
-document.addEventListener("change", e => {
+document.addEventListener("change", async e => {
   const t = e.target;
+  if (t.dataset.pimg && t.files && t.files[0]) {
+    const id = t.dataset.pimg;
+    try {
+      const data = await photoToDataUrl(t.files[0]);
+      state.images = Object.assign({}, state.images, { [id]: data }); render();
+      await Store.setImage(id, data); toast("写真を保存しました");
+    } catch (x) { toast(x && x.code ? errText(x) : "この写真は読み込めませんでした。JPEGかPNGを選んでください。"); }
+    return;
+  }
   if (t.dataset.dfield && state.ddraft) {
     const d = state.ddraft[+t.dataset.i];
     if (t.dataset.dfield === "kind") d.kind = t.value;
@@ -728,6 +787,11 @@ document.addEventListener("click", async e => {
     if (s) { try { await Store.putSale(Object.assign({}, s, { voided: !s.voided, voidedBy: me().id })); toast(s.voided ? "取消を戻しました" : "会計を取り消しました"); } catch (x) { toast(errText(x)); } }
     render(); return;
   }
+  if (ds.delimg) {
+    const id = ds.delimg; const next = Object.assign({}, state.images); delete next[id]; state.images = next; render();
+    try { await Store.setImage(id, null); toast("写真を外しました"); } catch (x) { toast(errText(x)); }
+    return;
+  }
   if (ds.delprod) { state.draft.splice(+ds.delprod, 1); render(); return; }
   if (ds.delacc) {
     try { await saveAccounts(state.accounts.filter(a => a.id !== ds.delacc)); toast("アカウントを削除しました"); } catch (x) { toast(errText(x)); }
@@ -759,7 +823,9 @@ document.addEventListener("click", async e => {
     case "resetProds": state.draft = null; render(); break;
     case "saveProds": {
       const items = state.draft.filter(p => String(p.name).trim()).map(p => ({ id: p.id, name: String(p.name).trim(), price: Number(p.price) || 0, active: p.active !== false, cat: catOf(p) }));
-      try { await Store.setDoc("products", { items, updatedAt: Date.now() }); state.products = items; state.draft = null; toast("商品を保存しました"); } catch (x) { toast(errText(x)); }
+      try { await Store.setDoc("products", { items, updatedAt: Date.now() }); state.products = items; state.draft = null;
+        // Drop photos of products that were deleted.
+        for (const id of Object.keys(state.images)) if (!items.some(p => p.id === id)) Store.setImage(id, null); toast("商品を保存しました"); } catch (x) { toast(errText(x)); }
       render(); break;
     }
     case "askWipe": state.confirmWipe = true; render(); break;
