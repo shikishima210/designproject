@@ -618,7 +618,6 @@
     unload: document.getElementById('view-unload')
   };
   window.__a1 = {view:'top', stepEl:null};
-  var currentObserver = null;
 
   function emit(name, detail){ document.dispatchEvent(new CustomEvent(name, {detail:detail})); }
   function setStep(viewEl, el){
@@ -633,25 +632,40 @@
     if(bar) root.style.setProperty('--topbar-h', bar.offsetHeight + 'px');
   }
 
+  // A step becomes current once its number square passes this line (fraction of viewport height from the top).
+  var STEP_LINE = 0.42;
+  var tracked = null;
+
+  function pickStep(){
+    if(!tracked) return;
+    var line = window.innerHeight * STEP_LINE, pick = tracked.steps[0];
+    for(var i = 0; i < tracked.steps.length; i++){
+      if(tracked.nums[i].getBoundingClientRect().top <= line) pick = tracked.steps[i];
+      else break;
+    }
+    if(pick === tracked.current) return;
+    tracked.current = pick;
+    tracked.stepNow.textContent = ('0' + pick.getAttribute('data-step')).slice(-2);
+    setStep(tracked.view, pick);
+  }
+
   function initProgress(viewEl){
-    if(currentObserver){ currentObserver.disconnect(); currentObserver = null; }
-    var steps = viewEl.querySelectorAll('.step');
+    tracked = null;
+    var steps = Array.prototype.slice.call(viewEl.querySelectorAll('.step'));
     var stepNow = viewEl.querySelector('.step-now');
     if(!steps.length || !stepNow) return;
-    stepNow.textContent = '01';
-    setStep(viewEl, steps[0]);
-    if('IntersectionObserver' in window){
-      currentObserver = new IntersectionObserver(function(entries){
-        entries.forEach(function(e){
-          if(e.isIntersecting){
-            stepNow.textContent = ('0' + e.target.getAttribute('data-step')).slice(-2);
-            setStep(viewEl, e.target);
-          }
-        });
-      }, {rootMargin:'-45% 0px -45% 0px'});
-      steps.forEach(function(s){ currentObserver.observe(s); });
-    }
+    tracked = {view:viewEl, steps:steps, nums:steps.map(function(s){ return s.querySelector('.step-num'); }), stepNow:stepNow, current:null};
+    pickStep();
   }
+
+  var pickQueued = false;
+  function queuePick(){
+    if(pickQueued) return;
+    pickQueued = true;
+    requestAnimationFrame(function(){ pickQueued = false; pickStep(); });
+  }
+  window.addEventListener('scroll', queuePick, {passive:true});
+  window.addEventListener('resize', queuePick);
 
   function updateFill(){
     var active = document.querySelector('.view:not([hidden])');
@@ -674,7 +688,7 @@
     window.__a1 = {view:name, stepEl:null};
     measureTopbar(views[name]);
     emit('a1:view', {view:name});
-    if(name !== 'top'){ initProgress(views[name]); }
+    if(name !== 'top'){ initProgress(views[name]); } else { tracked = null; }
     updateFill();
   }
 
